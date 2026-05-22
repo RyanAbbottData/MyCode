@@ -1,12 +1,12 @@
 from .base import AIBackend
-from ..ricky_client import RickyClient
+from ..mcp_client import MCPClient
 
 
 class RickyBackend(AIBackend):
     max_file_chars: int = 1500
 
     def __init__(self, url: str = "http://localhost:8000/mcp"):
-        self._client = RickyClient(url=url)
+        self._client = MCPClient(url=url)
 
     def ask_for_code(self, prompt: str) -> str:
         return self._client.ask_for_code(prompt)

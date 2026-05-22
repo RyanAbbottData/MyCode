@@ -3,12 +3,10 @@ import uuid
 
 import requests
 
-# Ricky's own instructions: give it explicit, complete prompts.
 _PROTOCOL = "2024-11-05"
 
 
 def _parse_sse_result(text: str) -> dict:
-    """Extract the first JSON-RPC result/error from an SSE response body."""
     for line in text.splitlines():
         if line.startswith("data:"):
             payload = line[5:].strip()
@@ -17,22 +15,25 @@ def _parse_sse_result(text: str) -> dict:
     raise ValueError(f"No data event in SSE body:\n{text[:400]}")
 
 
-class RickyClient:
-    """MCP client for ricky using the Streamable HTTP transport.
+class MCPClient:
+    """Generic MCP client using the Streamable HTTP transport.
 
     Flow:
       1. POST /mcp  initialize  → SSE body + Mcp-Session-Id header
-      2. POST /mcp  <any call>  → SSE body  (Mcp-Session-Id in every request)
+      2. POST /mcp  tools/list  → discover available tools
+      3. POST /mcp  tools/call  → invoke a tool
     """
 
-    def __init__(self, url: str = "http://localhost:8000/mcp"):
+    def __init__(self, url: str = "http://localhost:8001/mcp"):
         self.url = url
         self._session_id: str | None = None
         self._tool_name: str | None = None
         self._tool_name_analyze: str | None = None
+        self._code_arg: str = "query"
+        self._analyze_arg: str = "query"
         self._initialize()
         self._discover_tools()
-        print(f"Connected to ricky — tools: '{self._tool_name}', '{self._tool_name_analyze}'")
+        print(f"Connected to MCP server — tools: '{self._tool_name}', '{self._tool_name_analyze}'")
 
     def _post(self, method: str, params: dict, timeout: int = 120) -> dict:
         headers = {
@@ -66,47 +67,55 @@ class RickyClient:
             "clientInfo": {"name": "style-agent", "version": "1.0"},
         })
 
+    @staticmethod
+    def _first_arg(tool: dict) -> str:
+        schema = tool.get("inputSchema", {})
+        required = schema.get("required", [])
+        if required:
+            return required[0]
+        props = schema.get("properties", {})
+        return next(iter(props), "query")
+
     def _discover_tools(self):
         tools = self._post("tools/list", {}).get("tools", [])
         if not tools:
-            raise RuntimeError("Ricky exposes no tools")
+            raise RuntimeError("MCP server exposes no tools")
+
         for t in tools:
             name = t["name"]
+            arg = self._first_arg(t)
             if "analyze" in name and self._tool_name_analyze is None:
                 self._tool_name_analyze = name
+                self._analyze_arg = arg
             elif self._tool_name is None:
                 self._tool_name = name
-        if not self._tool_name:
-            raise RuntimeError("Ricky exposes no coding tool")
-        if not self._tool_name_analyze:
-            raise RuntimeError("Ricky exposes no analyze tool")
+                self._code_arg = arg
 
-    def _parse_content(self, result: dict) -> str:
+        if not self._tool_name:
+            self._tool_name = tools[0]["name"]
+            self._code_arg = self._first_arg(tools[0])
+        if not self._tool_name_analyze:
+            self._tool_name_analyze = self._tool_name
+            self._analyze_arg = self._code_arg
+
+    def _extract_text(self, result: dict) -> str:
         content = result.get("content", [])
         if isinstance(content, list):
             for block in content:
                 if block.get("type") == "text":
-                    text = block.get("text", "")
-                    # Ricky wraps llama.cpp output: {"result": "<completion JSON>"}
-                    try:
-                        outer = json.loads(text)
-                        inner_str = outer.get("result", text)
-                        inner = json.loads(inner_str)
-                        return inner["choices"][0]["text"]
-                    except (json.JSONDecodeError, KeyError, TypeError):
-                        return text
+                    return block.get("text", "")
         return str(content)
 
     def ask_for_code(self, prompt: str) -> str:
         result = self._post("tools/call", {
             "name": self._tool_name,
-            "arguments": {"query": prompt},
+            "arguments": {self._code_arg: prompt},
         })
-        return self._parse_content(result)
+        return self._extract_text(result)
 
     def ask_to_analyze(self, prompt: str) -> str:
         result = self._post("tools/call", {
             "name": self._tool_name_analyze,
-            "arguments": {"query": prompt},
+            "arguments": {self._analyze_arg: prompt},
         }, timeout=600)
-        return self._parse_content(result)
+        return self._extract_text(result)

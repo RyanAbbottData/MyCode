@@ -1,14 +1,13 @@
 from .base import AIBackend
-
-_MSG = "MCPBackend is not yet configured. Set the MCP server URL and implement this backend."
+from ..mcp_client import MCPClient
 
 
 class MCPBackend(AIBackend):
     def __init__(self, url: str = "http://localhost:8001/mcp"):
-        self.url = url
+        self._client = MCPClient(url=url)
 
     def ask_for_code(self, prompt: str) -> str:
-        raise NotImplementedError(_MSG)
+        return self._client.ask_for_code(prompt)
 
     def ask_to_analyze(self, prompt: str) -> str:
-        raise NotImplementedError(_MSG)
+        return self._client.ask_to_analyze(prompt)

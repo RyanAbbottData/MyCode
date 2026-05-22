@@ -140,7 +140,7 @@ Layout of my_code.py:
 1. Module docstring (usage examples)
 2. import argparse, sys, pathlib  (stdlib)
 3. from analyzer import StyleAnalyzer  (local)
-4. from ricky_client import RickyClient  (local)
+4. from mcp_client import MCPClient  (local)
 5. from utils.prompts import CODE_GENERATION_PROMPT  (local)
 6. DEFAULT_PROFILE = Path("style_profile.json")  (constant)
 7. def cmd_analyze(args): ...

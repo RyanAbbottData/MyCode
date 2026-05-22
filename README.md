@@ -302,7 +302,7 @@ The test suite uses a `MockBackend` so no live AI backend is required. It exerci
 my_code/
 ├── analyzer.py          # StyleAnalyzer — scans files, builds style profile
 ├── generator.py         # generate_code() — formats prompt and calls backend
-├── ricky_client.py      # Low-level MCP client for the local LLM server
+├── mcp_client.py        # Generic MCP client (Streamable HTTP transport)
 ├── cli.py               # CLI entry point (my-code command)
 ├── backends/
 │   ├── base.py          # AIBackend abstract base class
