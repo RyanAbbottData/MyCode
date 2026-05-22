@@ -54,18 +54,89 @@ MyCode delegates inference to a pluggable backend. Choose one based on what you 
 
 | Backend | Flag | Requirement |
 |---|---|---|
-| Local LLM via Ricky | `--backend llama` (default) | Ricky MCP server running at `localhost:8000` |
+| Local LLM | `--backend llama` (default) | MCP server running at `localhost:8000` |
 | Anthropic Claude | `--backend claude` | `ANTHROPIC_API_KEY` env var or `--api-key` |
 | OpenAI | `--backend openai` | `OPENAI_API_KEY` env var or `--api-key` |
 | Custom MCP server | `--backend mcp` | Any MCP server at `--mcp-url` |
 
-### Starting the local LLM backend (Ricky)
+### Setting up a local LLM
+
+The `llama` backend expects an MCP server at `http://localhost:8000/mcp` that exposes two tools: one for code generation and one for analysis. Any MCP-compatible wrapper around a local model will work. Here is a recommended setup using [llama.cpp](https://github.com/ggerganov/llama.cpp):
+
+**1. Download a model**
+
+A code-focused model works best. Good options:
+- [CodeLlama-7B-Instruct](https://huggingface.co/TheBloke/CodeLlama-7B-Instruct-GGUF) — fast, runs on most hardware
+- [CodeLlama-13B-Instruct](https://huggingface.co/TheBloke/CodeLlama-13B-Instruct-GGUF) — better quality, needs ~10 GB VRAM
+- [DeepSeek-Coder-6.7B-Instruct](https://huggingface.co/TheBloke/deepseek-coder-6.7B-instruct-GGUF) — strong alternative
+
+Download a `.gguf` quantized file (Q4_K_M is a good balance of size and quality).
+
+**2. Start the llama.cpp server**
 
 ```bash
-# Windows
-serve_llama.bat
+# Install llama.cpp (or use a pre-built binary)
+pip install llama-cpp-python[server]
 
-# The Ricky MCP server must be running before using --backend llama
+# Start the OpenAI-compatible server
+python -m llama_cpp.server \
+  --model ./models/codellama-7b-instruct.Q4_K_M.gguf \
+  --host 0.0.0.0 \
+  --port 8000 \
+  --n_ctx 4096
+```
+
+**3. Wrap it with an MCP server**
+
+The `llama` backend communicates over MCP, not directly with the llama.cpp HTTP API. You need a thin MCP wrapper that exposes two tools:
+- A **code generation tool** (name must not contain `"analyze"`)
+- An **analysis tool** (name must contain `"analyze"`)
+
+Both tools accept a `query` string and return the model's completion. A minimal FastMCP wrapper example:
+
+```python
+# llm_mcp_server.py
+from fastmcp import FastMCP
+import requests
+
+mcp = FastMCP("local-llm")
+LLM_URL = "http://localhost:8000/v1/completions"
+
+def _complete(prompt: str) -> str:
+    resp = requests.post(LLM_URL, json={
+        "prompt": prompt,
+        "max_tokens": 1024,
+        "temperature": 0.1,
+    })
+    return resp.json()["choices"][0]["text"]
+
+@mcp.tool()
+def generate_code(query: str) -> str:
+    return _complete(query)
+
+@mcp.tool()
+def analyze_code(query: str) -> str:
+    return _complete(query)
+
+if __name__ == "__main__":
+    mcp.run(transport="streamable-http", host="0.0.0.0", port=8000)
+```
+
+```bash
+pip install fastmcp
+python llm_mcp_server.py
+```
+
+**4. Point MyCode at it**
+
+```bash
+my-code --backend llama --ricky-url http://localhost:8000/mcp analyze .
+```
+
+Or set a custom URL if your server runs on a different port:
+
+```bash
+my-code --backend llama --ricky-url http://localhost:9000/mcp analyze .
 ```
 
 ---
@@ -126,7 +197,7 @@ Options:
   --backend {llama,claude,openai,mcp}   AI backend to use (default: llama)
   --api-key TEXT                         API key for claude/openai backends
   --model TEXT                           Override the default model
-  --ricky-url TEXT                       Ricky MCP server URL (default: http://localhost:8000/mcp)
+  --ricky-url TEXT                       Local LLM MCP server URL (default: http://localhost:8000/mcp)
   --mcp-url TEXT                         Custom MCP server URL (default: http://localhost:8001/mcp)
   --profile TEXT                         Path to style profile JSON (default: style_profile.json)
 
@@ -148,8 +219,8 @@ from my_code import StyleAnalyzer, generate_code, make_backend
 from pathlib import Path
 
 # Create a backend
-backend = make_backend()                          # local llama (default)
-backend = make_backend("claude")                  # Claude (reads ANTHROPIC_API_KEY)
+backend = make_backend()                           # local LLM (default)
+backend = make_backend("claude")                   # Claude (reads ANTHROPIC_API_KEY)
 backend = make_backend("openai", api_key="sk-...") # OpenAI
 
 # Analyze a codebase
@@ -224,11 +295,11 @@ The test suite uses a `MockBackend` so no live AI backend is required. It exerci
 my_code/
 ├── analyzer.py          # StyleAnalyzer — scans files, builds style profile
 ├── generator.py         # generate_code() — formats prompt and calls backend
-├── ricky_client.py      # Low-level MCP client for the local Ricky/llama server
+├── ricky_client.py      # Low-level MCP client for the local LLM server
 ├── cli.py               # CLI entry point (my-code command)
 ├── backends/
 │   ├── base.py          # AIBackend abstract base class
-│   ├── ricky_backend.py # Local LLM via Ricky MCP server
+│   ├── ricky_backend.py # Local LLM backend (connects via MCP)
 │   ├── claude_backend.py
 │   ├── openai_backend.py
 │   └── mcp_backend.py   # Placeholder for custom MCP backends
