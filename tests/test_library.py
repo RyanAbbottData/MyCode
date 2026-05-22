@@ -70,10 +70,13 @@ except ValueError as e:
     assert "OPENAI_API_KEY" in str(e)
     print(f"  openai: {e}")
 
-mcp = make_backend("mcp")
 try:
-    mcp.ask_for_code("test")
-except NotImplementedError as e:
-    print(f"  mcp placeholder: {e}")
+    make_backend("mcp")
+    assert False, "Should have raised — no MCP server running in CI"
+except Exception as e:
+    assert "Connection" in type(e).__name__ or "refused" in str(e).lower(), (
+        f"Expected a connection error, got: {type(e).__name__}: {e}"
+    )
+    print(f"  mcp: correctly attempts connection ({type(e).__name__})")
 
 print("\nAll tests passed.")
