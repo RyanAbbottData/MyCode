@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mycode-aiagent"
-version = "0.1.0"
+version = "0.1.1"
 description = "Style-aware code generation — analyze any codebase and generate new code that matches its style"
 readme = "README.md"
 requires-python = ">=3.10"
