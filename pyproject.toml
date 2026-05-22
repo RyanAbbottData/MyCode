@@ -3,11 +3,30 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "my-code"
+name = "mycode"
 version = "0.1.0"
-description = "Style-aware code generation agent using a local CodeLlama model via Ricky MCP"
+description = "Style-aware code generation — analyze any codebase and generate new code that matches its style"
+readme = "README.md"
 requires-python = ">=3.10"
+license = {text = "MIT"}
+keywords = ["code generation", "style analysis", "llm", "ai", "developer tools"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Code Generators",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = ["requests"]
+
+[project.urls]
+Homepage = "https://github.com/RyanAbbottData/MyCode"
+Repository = "https://github.com/RyanAbbottData/MyCode"
+Issues = "https://github.com/RyanAbbottData/MyCode/issues"
 
 [project.scripts]
 my-code = "my_code.cli:main"
