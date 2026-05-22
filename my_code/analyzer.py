@@ -5,15 +5,18 @@ from pathlib import Path
 from .backends import AIBackend
 from .utils.prompts import STYLE_EXTRACTION_PROMPT, STYLE_SUMMARY_PROMPT
 
-_SKIP_DIRS = {"__pycache__", ".git", ".venv", "venv", "node_modules", "dist", "build"}
+_SKIP_EXACT = {"__pycache__", ".git", "node_modules", "dist", "build"}
+
+
+def _should_skip(path: Path) -> bool:
+    return any(
+        part in _SKIP_EXACT or "venv" in part
+        for part in path.parts
+    )
 
 
 def _collect_python_files(root: Path) -> list[Path]:
-    files = []
-    for path in root.rglob("*.py"):
-        if not any(part in _SKIP_DIRS for part in path.parts):
-            files.append(path)
-    return sorted(files)
+    return sorted(p for p in root.rglob("*.py") if not _should_skip(p))
 
 
 def _extract_json(text: str) -> dict:
