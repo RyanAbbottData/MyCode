@@ -14,6 +14,7 @@ from pathlib import Path
 from .analyzer import StyleAnalyzer
 from .backends import make_backend
 from .generator import generate_code
+from .server import MCPServer
 
 DEFAULT_PROFILE = Path("style_profile.json")
 
@@ -64,6 +65,18 @@ def cmd_generate(args):
     print(code)
 
 
+def cmd_serve(args):
+    backend = make_backend(
+        backend=args.backend,
+        api_key=args.api_key,
+        ricky_url=args.ricky_url,
+        mcp_url=args.mcp_url,
+        model=args.model,
+        timeout=args.timeout,
+    )
+    MCPServer(backend, host=args.host, port=args.port, default_profile=args.profile).run()
+
+
 def main():
     parser = argparse.ArgumentParser(description="Style-aware code agent")
     parser.add_argument(
@@ -87,6 +100,11 @@ def main():
     p_gen = sub.add_parser("generate", help="Generate code matching the saved style profile")
     p_gen.add_argument("task", help="Description of what to write")
     p_gen.set_defaults(func=cmd_generate)
+
+    p_serve = sub.add_parser("serve", help="Start an MCP server exposing analyze and generate as tools")
+    p_serve.add_argument("--host", default="127.0.0.1", help="Host to bind (default: 127.0.0.1)")
+    p_serve.add_argument("--port", type=int, default=8080, help="Port to listen on (default: 8080)")
+    p_serve.set_defaults(func=cmd_serve)
 
     args = parser.parse_args()
     args.func(args)

@@ -213,6 +213,10 @@ Commands:
     --verbose     Print each file as it is analyzed
 
   generate TASK   Generate code matching the saved style profile
+
+  serve           Start an MCP server (blocks until Ctrl-C)
+    --host TEXT   Host to bind (default: 127.0.0.1)
+    --port INT    Port to listen on (default: 8080)
 ```
 
 ---
@@ -273,6 +277,77 @@ code = generate_code("write a logging helper", backend, profile)
 
 ---
 
+## Running as an MCP Server
+
+MyCode can expose itself as an MCP server so any MCP-compatible agent or orchestrator can call its tools directly — no MCP knowledge required.
+
+### Quick start
+
+```bash
+# Local LLM backend (default)
+my-code serve
+
+# Claude backend
+my-code --backend claude serve --port 8080
+
+# OpenAI backend
+my-code --backend openai serve --port 8080
+
+# Bind on all interfaces
+my-code --backend claude serve --host 0.0.0.0 --port 8080
+```
+
+On startup the server prints the URL and the config snippet to paste:
+
+```
+MyCode MCP server running at http://127.0.0.1:8080/mcp
+Add to your MCP config:  {"mycode": {"url": "http://127.0.0.1:8080/mcp"}}
+```
+
+### Connecting from an MCP consumer
+
+Add the printed snippet to your consumer's MCP config file (e.g. `.mcp.json`):
+
+```json
+{
+  "mycode": { "url": "http://127.0.0.1:8080/mcp" }
+}
+```
+
+### Tools exposed
+
+| Tool | Required args | Optional args |
+|------|--------------|---------------|
+| `analyze_codebase` | `path` — directory to analyze | `save_to` — path to save the profile JSON |
+| `generate_code` | `task` — what to write | `profile` — inline profile object; `profile_path` — path to a saved profile (default: `style_profile.json`) |
+
+Both tools return plain text. `analyze_codebase` returns the style profile as a JSON string. `generate_code` returns the generated source code.
+
+### Programmatic usage
+
+```python
+from my_code import run_server, make_backend
+
+# Blocking — call from a background thread if needed
+run_server(backend=make_backend("claude"), host="127.0.0.1", port=8080)
+```
+
+Or use `MCPServer` directly for more control:
+
+```python
+from my_code import MCPServer, make_backend
+import threading
+
+server = MCPServer(make_backend("claude"), host="127.0.0.1", port=8080)
+httpd = server.start()                          # binds immediately
+port = httpd.server_address[1]                  # actual port (useful when port=0)
+t = threading.Thread(target=httpd.serve_forever, daemon=True)
+t.start()
+# ... httpd.shutdown() to stop
+```
+
+---
+
 ## Deep Analysis
 
 For a richer style profile, `scripts/deep_analyze.py` runs six focused queries (naming, error handling, string formatting, module structure, docstrings, and representative snippets) and synthesizes them into a single detailed profile.
@@ -289,10 +364,16 @@ This is slower than the standard `analyze` command but produces a more detailed 
 ## Running Tests
 
 ```bash
+# Library smoke tests (analyze → generate pipeline)
 python tests/test_library.py
+
+# MCP server protocol tests
+python -m pytest tests/test_server.py -v
+# or
+python -m unittest tests/test_server.py
 ```
 
-The test suite uses a `MockBackend` so no live AI backend is required. It exercises the full analyze → generate pipeline.
+Both test suites use a `MockBackend` — no live AI backend required.
 
 ---
 
@@ -303,17 +384,19 @@ my_code/
 ├── analyzer.py          # StyleAnalyzer — scans files, builds style profile
 ├── generator.py         # generate_code() — formats prompt and calls backend
 ├── mcp_client.py        # Generic MCP client (Streamable HTTP transport)
+├── server.py            # MCPServer — exposes analyze/generate as MCP tools
 ├── cli.py               # CLI entry point (my-code command)
 ├── backends/
 │   ├── base.py          # AIBackend abstract base class
 │   ├── ricky_backend.py # Local LLM backend (connects via MCP)
 │   ├── claude_backend.py
 │   ├── openai_backend.py
-│   └── mcp_backend.py   # Placeholder for custom MCP backends
+│   └── mcp_backend.py   # Generic MCP server backend
 └── utils/
     └── prompts.py       # Prompt templates for extraction, summary, generation
 scripts/
 └── deep_analyze.py      # Multi-query deep style analysis
 tests/
-└── test_library.py      # Smoke tests (no live backend required)
+├── test_library.py      # Smoke tests for analyze/generate (no live backend)
+└── test_server.py       # MCP server protocol tests (no live backend)
 ```
