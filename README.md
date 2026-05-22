@@ -28,20 +28,27 @@ It is built to slot into larger agentic systems: the analyzer and generator are 
 
 ## Installation
 
+**From PyPI (recommended):**
+
 ```bash
-# Clone and install in editable mode
-git clone <repo-url>
+pip install mycode-aiagent
+
+# With Claude backend support
+pip install "mycode-aiagent[claude]"
+
+# With OpenAI backend support
+pip install "mycode-aiagent[openai]"
+
+# With all backends
+pip install "mycode-aiagent[all]"
+```
+
+**From source:**
+
+```bash
+git clone https://github.com/RyanAbbottData/MyCode
 cd MyCode
 pip install -e .
-
-# For Claude backend support
-pip install -e ".[claude]"
-
-# For OpenAI backend support
-pip install -e ".[openai]"
-
-# For all backends
-pip install -e ".[all]"
 ```
 
 The `my-code` CLI command is registered automatically on install.

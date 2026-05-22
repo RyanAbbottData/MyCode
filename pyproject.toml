@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mycode"
+name = "mycode-aiagent"
 version = "0.1.0"
 description = "Style-aware code generation — analyze any codebase and generate new code that matches its style"
 readme = "README.md"
