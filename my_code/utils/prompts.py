@@ -30,15 +30,20 @@ Source file ({filename}):
 ```
 """
 
-STYLE_SUMMARY_PROMPT = """\
-You are a code style analyst. Below are JSON style observations extracted from multiple files in a codebase. Synthesize them into a single authoritative style profile JSON.
+STYLE_MERGE_PROMPT = """\
+You are a code style analyst. Update the current style profile by merging in a new file observation.
 
-Use the same schema. For fields where files disagree, pick the majority or most consistent value. Add a "confidence" field (low/medium/high) per section. Keep representative_snippets to the 3 best examples across all files.
+Rules:
+- Where they agree, keep the value.
+- Where they disagree, pick the more consistent value.
+- Keep representative_snippets to the 3 best examples total.
+- Return ONLY valid JSON using the same schema.
 
-Return ONLY valid JSON.
+Current profile:
+{profile}
 
-Observations:
-{observations}
+New observation ({filename}):
+{observation}
 """
 
 CODE_GENERATION_PROMPT = """\

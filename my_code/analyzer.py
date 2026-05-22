@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 
 from .backends import AIBackend
-from .utils.prompts import STYLE_EXTRACTION_PROMPT, STYLE_SUMMARY_PROMPT
+from .utils.prompts import STYLE_EXTRACTION_PROMPT, STYLE_MERGE_PROMPT
 
 _SKIP_EXACT = {"__pycache__", ".git", "node_modules", "dist", "build"}
 
@@ -52,30 +52,32 @@ class StyleAnalyzer:
         if not files:
             raise FileNotFoundError(f"No Python files found under {root}")
 
-        observations = []
+        profile = {}
         for path in files:
             rel = path.relative_to(root)
             if verbose:
                 print(f"  Analyzing {rel} ...")
             obs = self.analyze_file(path)
-            if obs:
-                observations.append(obs)
+            if not obs:
+                continue
+            if not profile:
+                profile = obs
+                continue
+            prompt = STYLE_MERGE_PROMPT.format(
+                profile=json.dumps(profile, indent=2),
+                observation=json.dumps(obs, indent=2),
+                filename=path.name,
+            )
+            raw = self.backend.ask_to_analyze(prompt)
+            try:
+                profile = _extract_json(raw)
+            except (ValueError, json.JSONDecodeError) as e:
+                print(f"  [warn] Could not merge style from {path.name}: {e}")
 
-        if not observations:
+        if not profile:
             raise RuntimeError("No style data could be extracted from any file.")
 
-        if len(observations) == 1:
-            return observations[0]
-
-        prompt = STYLE_SUMMARY_PROMPT.format(
-            observations=json.dumps(observations, indent=2)
-        )
-        raw = self.backend.ask_to_analyze(prompt)
-        try:
-            return _extract_json(raw)
-        except (ValueError, json.JSONDecodeError) as e:
-            print(f"[warn] Could not synthesize profile, using first observation: {e}")
-            return observations[0]
+        return profile
 
     @staticmethod
     def save_profile(profile: dict, path: Path):
