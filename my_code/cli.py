@@ -29,6 +29,7 @@ def cmd_analyze(args):
         ricky_url=args.ricky_url,
         mcp_url=args.mcp_url,
         model=args.model,
+        timeout=args.timeout,
     )
 
     print(f"Analyzing codebase at {root} ...")
@@ -53,6 +54,7 @@ def cmd_generate(args):
         ricky_url=args.ricky_url,
         mcp_url=args.mcp_url,
         model=args.model,
+        timeout=args.timeout,
     )
 
     profile = json.loads(profile_path.read_text(encoding="utf-8"))
@@ -72,6 +74,7 @@ def main():
     parser.add_argument("--model", default=None, help="Override default model for claude/openai backends")
     parser.add_argument("--ricky-url", default="http://localhost:8000/mcp", help="Ricky MCP server URL (llama backend)")
     parser.add_argument("--mcp-url", default="http://localhost:8001/mcp", help="MCP server URL (mcp backend)")
+    parser.add_argument("--timeout", type=int, default=120, help="Request timeout in seconds (default: 120)")
     parser.add_argument("--profile", default=str(DEFAULT_PROFILE))
 
     sub = parser.add_subparsers(dest="command", required=True)

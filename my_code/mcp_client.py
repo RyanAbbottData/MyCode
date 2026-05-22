@@ -24,8 +24,9 @@ class MCPClient:
       3. POST /mcp  tools/call  → invoke a tool
     """
 
-    def __init__(self, url: str = "http://localhost:8001/mcp"):
+    def __init__(self, url: str = "http://localhost:8001/mcp", timeout: int = 120):
         self.url = url
+        self._timeout = timeout
         self._session_id: str | None = None
         self._tool_name: str | None = None
         self._tool_name_analyze: str | None = None
@@ -35,7 +36,7 @@ class MCPClient:
         self._discover_tools()
         print(f"Connected to MCP server — tools: '{self._tool_name}', '{self._tool_name_analyze}'")
 
-    def _post(self, method: str, params: dict, timeout: int = 120) -> dict:
+    def _post(self, method: str, params: dict) -> dict:
         headers = {
             "Content-Type": "application/json",
             "Accept": "application/json, text/event-stream",
@@ -49,7 +50,7 @@ class MCPClient:
             "method": method,
             "params": params,
         }
-        resp = requests.post(self.url, json=payload, headers=headers, timeout=timeout)
+        resp = requests.post(self.url, json=payload, headers=headers, timeout=self._timeout)
         resp.raise_for_status()
 
         if "Mcp-Session-Id" in resp.headers:
@@ -117,5 +118,5 @@ class MCPClient:
         result = self._post("tools/call", {
             "name": self._tool_name_analyze,
             "arguments": {self._analyze_arg: prompt},
-        }, timeout=600)
+        })
         return self._extract_text(result)
