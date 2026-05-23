@@ -63,13 +63,27 @@ MyCode delegates inference to a pluggable backend. Choose one based on what you 
 |---|---|---|
 | Anthropic Claude | `--backend claude` (default) | `ANTHROPIC_API_KEY` env var or `--api-key` |
 | OpenAI | `--backend openai` | `OPENAI_API_KEY` env var or `--api-key` |
-| Any MCP server | `--backend mcp` | An MCP server at `--mcp-url` (MyCode server or local LLM wrapper) |
+| Local LLM (OpenAI-compatible) | `--backend local` | LLM server at `--llm-url` (default: `http://localhost:8080/v1`) |
+| Any MCP server | `--backend mcp` | A running MyCode MCP server at `--mcp-url` |
 
 When `--backend mcp` is used with `analyze` or `generate`, the CLI delegates the entire operation to the running MyCode server — it calls the server's `analyze_codebase` or `generate_code` tool directly instead of running the pipeline locally. This is the recommended way to use MyCode in a multi-project or agentic setup.
 
 ### Setting up a local LLM
 
-The `mcp` backend can connect to any MCP server, including a local LLM wrapper. The server must expose two tools: one for code generation and one for analysis (tool name must contain `"analyze"`). Here is a recommended setup using [llama.cpp](https://github.com/ggerganov/llama.cpp):
+Use `--backend local` to connect MyCode directly to any OpenAI-compatible LLM server (llama.cpp, LM Studio, Ollama, etc.) — no wrapper needed. Point `--llm-url` at the server's `/v1` base URL:
+
+```bash
+# Start your local LLM server (example: llama.cpp)
+python -m llama_cpp.server --model ./models/codellama-7b-instruct.Q4_K_M.gguf --port 8080
+
+# Analyze using the local LLM directly
+my-code --backend local --llm-url http://localhost:8080/v1 analyze ./my_project
+
+# Or start a MyCode MCP server backed by your local LLM
+my-code --backend local --llm-url http://localhost:8080/v1 serve --port 8000 --daemon
+```
+
+If you need a full MCP-wrapped setup instead (e.g. the local LLM exposes only `/v1/completions` without chat completions), here is a recommended pattern using [llama.cpp](https://github.com/ggerganov/llama.cpp):
 
 **1. Download a model**
 
@@ -168,6 +182,7 @@ Using a different backend:
 ```bash
 my-code --backend claude analyze ./path/to/codebase
 my-code --backend openai --api-key sk-... analyze ./path/to/codebase
+my-code --backend local --llm-url http://localhost:8080/v1 analyze ./path/to/codebase
 ```
 
 The profile is saved to `style_profile.json` by default. Specify a different path with `--profile`:
@@ -210,10 +225,11 @@ my-code --backend mcp --mcp-url http://localhost:8000/mcp generate "write a rate
 my-code [OPTIONS] COMMAND
 
 Options:
-  --backend {claude,openai,mcp}          AI backend to use (default: claude)
+  --backend {claude,openai,local,mcp}    AI backend to use (default: claude)
   --api-key TEXT                         API key for claude/openai backends
   --model TEXT                           Override the default model
-  --mcp-url TEXT                         MCP server URL (default: http://localhost:8001/mcp)
+  --mcp-url TEXT                         MyCode MCP server URL (mcp backend, default: http://localhost:8001/mcp)
+  --llm-url TEXT                         Base URL of a local OpenAI-compatible LLM server (local backend, default: http://localhost:8080/v1)
   --profile TEXT                         Path to style profile JSON (default: style_profile.json)
 
 Commands:
@@ -243,9 +259,10 @@ from my_code import StyleAnalyzer, generate_code, make_backend
 from pathlib import Path
 
 # Create a backend
-backend = make_backend()                           # local LLM (default)
-backend = make_backend("claude")                   # Claude (reads ANTHROPIC_API_KEY)
-backend = make_backend("openai", api_key="sk-...") # OpenAI
+backend = make_backend("claude")                                              # Claude (reads ANTHROPIC_API_KEY)
+backend = make_backend("openai", api_key="sk-...")                            # OpenAI (GPT models)
+backend = make_backend("local", llm_url="http://localhost:8080/v1")           # Local LLM (OpenAI-compatible)
+backend = make_backend("mcp",   mcp_url="http://localhost:8000/mcp")          # Delegate to a MyCode server
 
 # Analyze a codebase
 analyzer = StyleAnalyzer(backend)
@@ -297,14 +314,14 @@ MyCode can expose itself as an MCP server so any MCP-compatible agent or orchest
 ### Quick start
 
 ```bash
-# Local LLM backend (default) — foreground, blocks until Ctrl-C
-my-code serve
-
-# Claude backend
+# Claude backend — foreground, blocks until Ctrl-C
 my-code --backend claude serve --port 8080
 
 # OpenAI backend
 my-code --backend openai serve --port 8080
+
+# Local LLM (OpenAI-compatible server on port 8080)
+my-code --backend local --llm-url http://localhost:8080/v1 serve --port 8000
 
 # Bind on all interfaces
 my-code --backend claude serve --host 0.0.0.0 --port 8080
@@ -348,8 +365,8 @@ my-code stop --pid-file mycode-8081.pid
 Start a MyCode server as a daemon, then point `analyze` and `generate` at it with `--backend mcp`. The CLI calls the server's tools directly — the server handles all analysis and generation using whichever LLM it was started with.
 
 ```bash
-# Start the server (uses a local LLM at port 8001 as its brain)
-my-code --backend mcp --mcp-url http://localhost:8001/mcp serve --daemon --port 8000
+# Start the server backed by a local LLM
+my-code --backend local --llm-url http://localhost:8080/v1 serve --daemon --port 8000
 
 # Analyze a codebase via the server
 my-code --backend mcp --mcp-url http://localhost:8000/mcp analyze ./my_project

@@ -7,11 +7,11 @@ from .mcp_backend import MCPBackend
 
 __all__ = ["AIBackend", "ClaudeBackend", "OpenAIBackend", "MCPBackend", "make_backend"]
 
-
 def make_backend(
     backend: str = "claude",
     api_key: str | None = None,
     mcp_url: str = "http://localhost:8001/mcp",
+    llm_url: str = "http://localhost:8080/v1",
     model: str | None = None,
     timeout: int = 120,
 ) -> AIBackend:
@@ -25,6 +25,8 @@ def make_backend(
         if not key:
             raise ValueError("OpenAI backend requires OPENAI_API_KEY or --api-key")
         return OpenAIBackend(api_key=key, **{"model": model} if model else {})
+    if backend == "local":
+        return OpenAIBackend(api_key=api_key or "none", base_url=llm_url, **{"model": model} if model else {})
     if backend == "mcp":
         return MCPBackend(url=mcp_url, timeout=timeout)
-    raise ValueError(f"Unknown backend {backend!r}. Choose: claude, openai, mcp")
+    raise ValueError(f"Unknown backend {backend!r}. Choose: claude, openai, local, mcp")

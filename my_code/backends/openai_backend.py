@@ -2,12 +2,15 @@ from .base import AIBackend
 
 
 class OpenAIBackend(AIBackend):
-    def __init__(self, api_key: str, model: str = "gpt-4o"):
+    def __init__(self, api_key: str, model: str = "gpt-4o", base_url: str | None = None):
         try:
             import openai
         except ImportError:
             raise ImportError("OpenAI backend requires 'openai': pip install 'my-code[openai]'")
-        self._client = openai.OpenAI(api_key=api_key)
+        client_kwargs = {"api_key": api_key}
+        if base_url is not None:
+            client_kwargs["base_url"] = base_url
+        self._client = openai.OpenAI(**client_kwargs)
         self._model = model
 
     def _call(self, system: str, prompt: str) -> str:
