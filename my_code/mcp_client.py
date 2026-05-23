@@ -104,8 +104,25 @@ class MCPClient:
         if isinstance(content, list):
             for block in content:
                 if block.get("type") == "text":
-                    return block.get("text", "")
+                    return self._unwrap_llm_response(block.get("text", ""))
         return str(content)
+
+    @staticmethod
+    def _unwrap_llm_response(text: str) -> str:
+        try:
+            data = json.loads(text)
+            if isinstance(data, dict) and "choices" in data:
+                choices = data["choices"]
+                if choices:
+                    choice = choices[0]
+                    if "text" in choice:
+                        return choice["text"]
+                    content = choice.get("message", {}).get("content")
+                    if content:
+                        return content
+        except (json.JSONDecodeError, KeyError, IndexError):
+            pass
+        return text
 
     def ask_for_code(self, prompt: str) -> str:
         result = self._post("tools/call", {
