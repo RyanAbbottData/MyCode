@@ -61,16 +61,15 @@ MyCode delegates inference to a pluggable backend. Choose one based on what you 
 
 | Backend | Flag | Requirement |
 |---|---|---|
-| Local LLM | `--backend llama` (default) | MCP server running at `localhost:8000` |
-| Anthropic Claude | `--backend claude` | `ANTHROPIC_API_KEY` env var or `--api-key` |
+| Anthropic Claude | `--backend claude` (default) | `ANTHROPIC_API_KEY` env var or `--api-key` |
 | OpenAI | `--backend openai` | `OPENAI_API_KEY` env var or `--api-key` |
-| MyCode server | `--backend mcp` | A running MyCode MCP server at `--mcp-url` |
+| Any MCP server | `--backend mcp` | An MCP server at `--mcp-url` (MyCode server or local LLM wrapper) |
 
 When `--backend mcp` is used with `analyze` or `generate`, the CLI delegates the entire operation to the running MyCode server — it calls the server's `analyze_codebase` or `generate_code` tool directly instead of running the pipeline locally. This is the recommended way to use MyCode in a multi-project or agentic setup.
 
 ### Setting up a local LLM
 
-The `llama` backend expects an MCP server at `http://localhost:8000/mcp` that exposes two tools: one for code generation and one for analysis. Any MCP-compatible wrapper around a local model will work. Here is a recommended setup using [llama.cpp](https://github.com/ggerganov/llama.cpp):
+The `mcp` backend can connect to any MCP server, including a local LLM wrapper. The server must expose two tools: one for code generation and one for analysis (tool name must contain `"analyze"`). Here is a recommended setup using [llama.cpp](https://github.com/ggerganov/llama.cpp):
 
 **1. Download a model**
 
@@ -97,7 +96,7 @@ python -m llama_cpp.server \
 
 **3. Wrap it with an MCP server**
 
-The `llama` backend communicates over MCP, not directly with the llama.cpp HTTP API. You need a thin MCP wrapper that exposes two tools:
+The `mcp` backend communicates over MCP, not directly with the llama.cpp HTTP API. You need a thin MCP wrapper that exposes two tools:
 - A **code generation tool** (name must not contain `"analyze"`)
 - An **analysis tool** (name must contain `"analyze"`)
 
@@ -139,13 +138,13 @@ python llm_mcp_server.py
 **4. Point MyCode at it**
 
 ```bash
-my-code --backend llama --ricky-url http://localhost:8000/mcp analyze .
+my-code --backend mcp --mcp-url http://localhost:8000/mcp analyze .
 ```
 
 Or set a custom URL if your server runs on a different port:
 
 ```bash
-my-code --backend llama --ricky-url http://localhost:9000/mcp analyze .
+my-code --backend mcp --mcp-url http://localhost:9000/mcp analyze .
 ```
 
 ---
@@ -211,11 +210,10 @@ my-code --backend mcp --mcp-url http://localhost:8000/mcp generate "write a rate
 my-code [OPTIONS] COMMAND
 
 Options:
-  --backend {llama,claude,openai,mcp}   AI backend to use (default: llama)
+  --backend {claude,openai,mcp}          AI backend to use (default: claude)
   --api-key TEXT                         API key for claude/openai backends
   --model TEXT                           Override the default model
-  --ricky-url TEXT                       Local LLM MCP server URL (default: http://localhost:8000/mcp)
-  --mcp-url TEXT                         Custom MCP server URL (default: http://localhost:8001/mcp)
+  --mcp-url TEXT                         MCP server URL (default: http://localhost:8001/mcp)
   --profile TEXT                         Path to style profile JSON (default: style_profile.json)
 
 Commands:
@@ -447,7 +445,6 @@ my_code/
 ├── cli.py               # CLI entry point (my-code command)
 ├── backends/
 │   ├── base.py          # AIBackend abstract base class
-│   ├── ricky_backend.py # Local LLM backend (connects via MCP)
 │   ├── claude_backend.py
 │   ├── openai_backend.py
 │   └── mcp_backend.py   # Generic MCP server backend

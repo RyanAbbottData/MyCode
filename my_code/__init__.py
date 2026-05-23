@@ -2,7 +2,7 @@ __version__ = "0.3.0"
 
 from .analyzer import StyleAnalyzer
 from .generator import generate_code
-from .backends import AIBackend, ClaudeBackend, OpenAIBackend, RickyBackend, MCPBackend, make_backend
+from .backends import AIBackend, ClaudeBackend, OpenAIBackend, MCPBackend, make_backend
 from .server import MCPServer
 
 
@@ -17,7 +17,6 @@ __all__ = [
     "AIBackend",
     "ClaudeBackend",
     "OpenAIBackend",
-    "RickyBackend",
     "MCPBackend",
     "make_backend",
     "MCPServer",

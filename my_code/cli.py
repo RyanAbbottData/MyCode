@@ -2,8 +2,8 @@
 Style-aware code generation agent.
 
 Usage:
-  my-code [--backend llama|claude|openai] analyze <dir>
-  my-code [--backend llama|claude|openai] --api-key <key> generate "<task>"
+  my-code [--backend claude|openai|mcp] analyze <dir>
+  my-code [--backend claude|openai|mcp] --api-key <key> generate "<task>"
 """
 
 import argparse
@@ -38,7 +38,6 @@ def cmd_analyze(args):
     backend = make_backend(
         backend=args.backend,
         api_key=args.api_key,
-        ricky_url=args.ricky_url,
         mcp_url=args.mcp_url,
         model=args.model,
         timeout=args.timeout,
@@ -70,7 +69,6 @@ def cmd_generate(args):
     backend = make_backend(
         backend=args.backend,
         api_key=args.api_key,
-        ricky_url=args.ricky_url,
         mcp_url=args.mcp_url,
         model=args.model,
         timeout=args.timeout,
@@ -87,7 +85,6 @@ def _spawn_daemon(args):
     cmd = [
         sys.executable, "-m", "my_code",
         "--backend", args.backend,
-        "--ricky-url", args.ricky_url,
         "--mcp-url", args.mcp_url,
         "--timeout", str(args.timeout),
         "--profile", args.profile,
@@ -127,7 +124,6 @@ def cmd_serve(args):
     backend = make_backend(
         backend=args.backend,
         api_key=args.api_key,
-        ricky_url=args.ricky_url,
         mcp_url=args.mcp_url,
         model=args.model,
         timeout=args.timeout,
@@ -138,12 +134,11 @@ def cmd_serve(args):
 def main():
     parser = argparse.ArgumentParser(description="Style-aware code agent")
     parser.add_argument(
-        "--backend", default="llama", choices=["llama", "claude", "openai", "mcp"],
-        help="AI backend to use (default: llama)",
+        "--backend", default="claude", choices=["claude", "openai", "mcp"],
+        help="AI backend to use (default: claude)",
     )
     parser.add_argument("--api-key", default=None, help="API key (claude/openai); falls back to env var")
     parser.add_argument("--model", default=None, help="Override default model for claude/openai backends")
-    parser.add_argument("--ricky-url", default="http://localhost:8000/mcp", help="Ricky MCP server URL (llama backend)")
     parser.add_argument("--mcp-url", default="http://localhost:8001/mcp", help="MCP server URL (mcp backend)")
     parser.add_argument("--timeout", type=int, default=120, help="Request timeout in seconds (default: 120)")
     parser.add_argument("--profile", default=str(DEFAULT_PROFILE))

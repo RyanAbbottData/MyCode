@@ -1,5 +1,5 @@
 """
-Deep style analysis: runs focused per-dimension Ricky queries then synthesizes
+Deep style analysis: runs focused per-dimension LLM queries then synthesizes
 a detailed style_profile.json. Run from the project root.
 """
 import json
@@ -49,7 +49,7 @@ def _collect_python_files(root: Path) -> list[Path]:
             files.append(path)
     return sorted(files)
 
-class RickyClient:
+class MCPClientExample:
     def __init__(self, url: str = "http://localhost:8000/mcp"):
         self.url = url
         self._session_id: str | None = None
@@ -89,9 +89,9 @@ def cmd_generate(args):
 def _discover_tools(self):
     tools = self._post("tools/list", {}).get("tools", [])
     if not tools:
-        raise RuntimeError("Ricky exposes no tools")
+        raise RuntimeError("MCP server exposes no tools")
     if not self._tool_name:
-        raise RuntimeError("Ricky exposes no coding tool")
+        raise RuntimeError("MCP server exposes no coding tool")
 
 def analyze_codebase(self, root: Path, verbose: bool = False) -> dict:
     files = _collect_python_files(root)
@@ -112,8 +112,8 @@ Analyze this Python code and return ONLY a JSON object with these exact keys:
 Return ONLY valid JSON, no explanation.
 
 Code:
-print(f"Connecting to ricky at {args.ricky_url} ...")
-print(f"Connected to ricky — tools: '{self._tool_name}', '{self._tool_name_analyze}'")
+print(f"Connecting to MCP server at {args.mcp_url} ...")
+print(f"Connected to MCP server — tools: '{self._tool_name}', '{self._tool_name_analyze}'")
 raise ValueError(f"No data event in SSE body:\\n{text[:400]}")
 raise RuntimeError(f"MCP error ({method}): {msg['error']}")
 print(f"  [warn] Could not parse style from {path.name}: {e}")
@@ -163,15 +163,15 @@ Examples:
 def _parse_sse_result(text: str) -> dict:
     \"\"\"Extract the first JSON-RPC result/error from an SSE response body.\"\"\"
 
-class RickyClient:
-    \"\"\"MCP client for ricky using the Streamable HTTP transport.
+class MCPClientExample:
+    \"\"\"MCP client for local LLM server using the Streamable HTTP transport.
 
     Flow:
       1. POST /mcp  initialize -> SSE body + Mcp-Session-Id header
       2. POST /mcp  <any call> -> SSE body  (Mcp-Session-Id in every request)
     \"\"\"
 
-# Ricky's own instructions: give it explicit, complete prompts.
+# Give the LLM explicit, complete prompts.
 _PROTOCOL = "2024-11-05"
 
 # keep prompts within CodeLlama 7B's context
