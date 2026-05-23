@@ -137,3 +137,29 @@ class MCPClient:
             "arguments": {self._analyze_arg: prompt},
         })
         return self._extract_text(result)
+
+
+class MyCodeClient(MCPClient):
+    """Client for a running MyCode MCP server. Calls semantic tools directly."""
+
+    def __init__(self, url: str = "http://localhost:8000/mcp", timeout: int = 120):
+        self.url = url
+        self._timeout = timeout
+        self._session_id = None
+        self._initialize()
+
+    def analyze_codebase(self, path: str, save_to: str | None = None) -> dict:
+        args = {"path": path}
+        if save_to:
+            args["save_to"] = save_to
+        result = self._post("tools/call", {"name": "analyze_codebase", "arguments": args})
+        return json.loads(self._extract_text(result))
+
+    def generate_code(self, task: str, profile: dict | None = None, profile_path: str | None = None) -> str:
+        args = {"task": task}
+        if profile is not None:
+            args["profile"] = profile
+        elif profile_path:
+            args["profile_path"] = profile_path
+        result = self._post("tools/call", {"name": "generate_code", "arguments": args})
+        return self._extract_text(result)

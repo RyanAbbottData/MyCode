@@ -17,6 +17,7 @@ from pathlib import Path
 from .analyzer import StyleAnalyzer
 from .backends import make_backend
 from .generator import generate_code
+from .mcp_client import MyCodeClient
 from .server import MCPServer
 
 DEFAULT_PROFILE = Path("style_profile.json")
@@ -26,6 +27,13 @@ def cmd_analyze(args):
     root = Path(args.codebase).resolve()
     if not root.exists():
         sys.exit(f"Error: directory not found: {root}")
+
+    if args.backend == "mcp":
+        client = MyCodeClient(args.mcp_url, args.timeout)
+        print(f"Analyzing codebase at {root} via MyCode server ...")
+        profile = client.analyze_codebase(str(root))
+        StyleAnalyzer.save_profile(profile, Path(args.profile))
+        return
 
     backend = make_backend(
         backend=args.backend,
@@ -51,6 +59,13 @@ def cmd_generate(args):
             f"Error: style profile not found at {profile_path}. "
             "Run 'analyze' first."
         )
+
+    if args.backend == "mcp":
+        profile = json.loads(profile_path.read_text(encoding="utf-8"))
+        client = MyCodeClient(args.mcp_url, args.timeout)
+        print("Generating code ...\n")
+        print(client.generate_code(args.task, profile=profile))
+        return
 
     backend = make_backend(
         backend=args.backend,

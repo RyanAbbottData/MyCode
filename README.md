@@ -64,7 +64,9 @@ MyCode delegates inference to a pluggable backend. Choose one based on what you 
 | Local LLM | `--backend llama` (default) | MCP server running at `localhost:8000` |
 | Anthropic Claude | `--backend claude` | `ANTHROPIC_API_KEY` env var or `--api-key` |
 | OpenAI | `--backend openai` | `OPENAI_API_KEY` env var or `--api-key` |
-| Custom MCP server | `--backend mcp` | Any MCP server at `--mcp-url` |
+| MyCode server | `--backend mcp` | A running MyCode MCP server at `--mcp-url` |
+
+When `--backend mcp` is used with `analyze` or `generate`, the CLI delegates the entire operation to the running MyCode server — it calls the server's `analyze_codebase` or `generate_code` tool directly instead of running the pipeline locally. This is the recommended way to use MyCode in a multi-project or agentic setup.
 
 ### Setting up a local LLM
 
@@ -174,6 +176,11 @@ The profile is saved to `style_profile.json` by default. Specify a different pat
 my-code analyze ./path/to/codebase --profile ./profiles/my_team.json
 ```
 
+Delegating to a running MyCode server:
+```bash
+my-code --backend mcp --mcp-url http://localhost:8000/mcp analyze ./path/to/codebase
+```
+
 ### Step 2 — Generate code
 
 ```bash
@@ -191,6 +198,9 @@ my-code --backend claude generate "write a binary search function"
 
 # Override the model
 my-code --backend claude --model claude-sonnet-4-6 generate "write a rate limiter"
+
+# Delegate to a running MyCode server
+my-code --backend mcp --mcp-url http://localhost:8000/mcp generate "write a rate limiter"
 ```
 
 ---
@@ -335,6 +345,24 @@ my-code stop --pid-file mycode-8080.pid
 my-code stop --pid-file mycode-8081.pid
 ```
 
+### Using the server from the CLI
+
+Start a MyCode server as a daemon, then point `analyze` and `generate` at it with `--backend mcp`. The CLI calls the server's tools directly — the server handles all analysis and generation using whichever LLM it was started with.
+
+```bash
+# Start the server (uses a local LLM at port 8001 as its brain)
+my-code --backend mcp --mcp-url http://localhost:8001/mcp serve --daemon --port 8000
+
+# Analyze a codebase via the server
+my-code --backend mcp --mcp-url http://localhost:8000/mcp analyze ./my_project
+
+# Generate code via the server (loads style_profile.json locally and sends it)
+my-code --backend mcp --mcp-url http://localhost:8000/mcp generate "write a retry decorator"
+
+# Stop the server
+my-code stop
+```
+
 ### Connecting from an MCP consumer
 
 Add the printed snippet to your consumer's MCP config file (e.g. `.mcp.json`):
@@ -414,7 +442,7 @@ Both test suites use a `MockBackend` — no live AI backend required.
 my_code/
 ├── analyzer.py          # StyleAnalyzer — scans files, builds style profile
 ├── generator.py         # generate_code() — formats prompt and calls backend
-├── mcp_client.py        # Generic MCP client (Streamable HTTP transport)
+├── mcp_client.py        # MCPClient (raw LLM wrapper) + MyCodeClient (server delegation)
 ├── server.py            # MCPServer — exposes analyze/generate as MCP tools
 ├── cli.py               # CLI entry point (my-code command)
 ├── backends/
