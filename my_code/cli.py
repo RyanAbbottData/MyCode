@@ -8,6 +8,9 @@ Usage:
 
 import argparse
 import json
+import os
+import signal
+import subprocess
 import sys
 from pathlib import Path
 
@@ -65,7 +68,47 @@ def cmd_generate(args):
     print(code)
 
 
+def _spawn_daemon(args):
+    cmd = [
+        sys.executable, "-m", "my_code",
+        "--backend", args.backend,
+        "--ricky-url", args.ricky_url,
+        "--mcp-url", args.mcp_url,
+        "--timeout", str(args.timeout),
+        "--profile", args.profile,
+        "serve",
+        "--host", args.host,
+        "--port", str(args.port),
+    ]
+    if args.api_key:
+        cmd += ["--api-key", args.api_key]
+    if args.model:
+        cmd += ["--model", args.model]
+
+    kwargs = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
+    if sys.platform == "win32":
+        kwargs["creationflags"] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        kwargs["start_new_session"] = True
+
+    proc = subprocess.Popen(cmd, **kwargs)
+    Path(args.pid_file).write_text(str(proc.pid))
+    print(f"MyCode MCP server started as daemon (PID {proc.pid}) at http://{args.host}:{args.port}/mcp")
+    print(f"Stop with: my-code stop --pid-file {args.pid_file}")
+
+
+def cmd_stop(args):
+    pid_file = Path(args.pid_file)
+    pid = int(pid_file.read_text().strip())
+    os.kill(pid, signal.SIGTERM)
+    pid_file.unlink()
+    print(f"MyCode MCP server (PID {pid}) stopped.")
+
+
 def cmd_serve(args):
+    if args.daemon:
+        _spawn_daemon(args)
+        return
     backend = make_backend(
         backend=args.backend,
         api_key=args.api_key,
@@ -104,7 +147,13 @@ def main():
     p_serve = sub.add_parser("serve", help="Start an MCP server exposing analyze and generate as tools")
     p_serve.add_argument("--host", default="127.0.0.1", help="Host to bind (default: 127.0.0.1)")
     p_serve.add_argument("--port", type=int, default=8080, help="Port to listen on (default: 8080)")
+    p_serve.add_argument("--daemon", action="store_true", help="Run server as a detached background process")
+    p_serve.add_argument("--pid-file", default="mycode.pid", help="PID file path when running as daemon (default: mycode.pid)")
     p_serve.set_defaults(func=cmd_serve)
+
+    p_stop = sub.add_parser("stop", help="Stop a running daemon server")
+    p_stop.add_argument("--pid-file", default="mycode.pid", help="PID file written by 'serve --daemon' (default: mycode.pid)")
+    p_stop.set_defaults(func=cmd_stop)
 
     args = parser.parse_args()
     args.func(args)

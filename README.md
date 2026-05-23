@@ -214,9 +214,14 @@ Commands:
 
   generate TASK   Generate code matching the saved style profile
 
-  serve           Start an MCP server (blocks until Ctrl-C)
-    --host TEXT   Host to bind (default: 127.0.0.1)
-    --port INT    Port to listen on (default: 8080)
+  serve              Start an MCP server (blocks until Ctrl-C)
+    --host TEXT      Host to bind (default: 127.0.0.1)
+    --port INT       Port to listen on (default: 8080)
+    --daemon         Run as a detached background process
+    --pid-file TEXT  PID file path for daemon mode (default: mycode.pid)
+
+  stop               Stop a running daemon server
+    --pid-file TEXT  PID file written by 'serve --daemon' (default: mycode.pid)
 ```
 
 ---
@@ -284,7 +289,7 @@ MyCode can expose itself as an MCP server so any MCP-compatible agent or orchest
 ### Quick start
 
 ```bash
-# Local LLM backend (default)
+# Local LLM backend (default) — foreground, blocks until Ctrl-C
 my-code serve
 
 # Claude backend
@@ -302,6 +307,32 @@ On startup the server prints the URL and the config snippet to paste:
 ```
 MyCode MCP server running at http://127.0.0.1:8080/mcp
 Add to your MCP config:  {"mycode": {"url": "http://127.0.0.1:8080/mcp"}}
+```
+
+### Running as a daemon
+
+Add `--daemon` to run the server as a detached background process. The terminal returns immediately and the server keeps running.
+
+```bash
+my-code --backend claude serve --daemon
+# → MyCode MCP server started as daemon (PID 12345) at http://127.0.0.1:8080/mcp
+# → Stop with: my-code stop
+```
+
+The PID is written to `mycode.pid` by default. Stop the server with:
+
+```bash
+my-code stop
+```
+
+When running multiple instances on different ports, use `--pid-file` to keep them separate:
+
+```bash
+my-code --backend claude serve --port 8080 --daemon --pid-file mycode-8080.pid
+my-code --backend openai serve --port 8081 --daemon --pid-file mycode-8081.pid
+
+my-code stop --pid-file mycode-8080.pid
+my-code stop --pid-file mycode-8081.pid
 ```
 
 ### Connecting from an MCP consumer
