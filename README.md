@@ -74,7 +74,7 @@ Use `--backend local` to connect MyCode directly to any OpenAI-compatible LLM se
 
 ```bash
 # Start your local LLM server (example: llama.cpp)
-python -m llama_cpp.server --model ./models/codellama-7b-instruct.Q4_K_M.gguf --port 8080
+llama-server -m ./models/codellama-7b-instruct.Q4_K_M.gguf --port 8080 --chat-template llama2 --ctx-size 4096
 
 # Analyze using the local LLM directly
 my-code --backend local --llm-url http://localhost:8080/v1 analyze ./my_project
@@ -87,11 +87,21 @@ my-code --backend local --llm-url http://localhost:8080/v1 serve --port 8000 --d
 >
 > The `local` backend sends `max_tokens=2048` per call, overriding the llama-server default of 128 tokens, so style analysis JSON is never silently truncated.
 
+**JSON output reliability:** The `local` backend requests `response_format: json_object` (constrained decoding) for all analysis calls. When supported by the server, this forces the model to produce valid JSON at the sampling level — eliminating hallucinated non-JSON output regardless of model size. If the server does not support it, the backend falls back to unguided generation automatically.
+
+| Server | Constrained JSON (`response_format`) |
+|---|---|
+| llama.cpp (`llama-server`) | ✓ |
+| Ollama | ✓ |
+| LM Studio | ✓ |
+| vLLM | ✓ |
+| text-generation-webui | varies by version |
+
 **Chat template / instruction format:** If your local server does not automatically apply the model's chat template, the model may ignore instructions and return conversational text instead of JSON. Two ways to fix this:
 
-1. **Server-side (recommended):** Pass `--chat-template llama2` when starting llama.cpp so the server applies the template to every request automatically.
+1. **Server-side (recommended):** Pass `--chat-template llama2 --ctx-size 4096` when starting llama.cpp. The chat template ensures instructions are followed; the context size ensures the full prompt fits without truncation.
    ```bat
-   llama-server.exe -m codellama-7b-instruct.Q4_K_M.gguf --port 8080 --chat-template llama2
+   llama-server.exe -m codellama-7b-instruct.Q4_K_M.gguf --port 8080 --chat-template llama2 --ctx-size 4096
    ```
 
 2. **Client-side:** Pass `--prompt-format llama2` to `my-code` to have the client wrap prompts in `[INST]`/`[/INST]` before sending.

@@ -48,6 +48,10 @@ class LocalBackend(OpenAIBackend):
     chat template automatically (e.g. llama.cpp without --chat-template).
     """
 
+    # Cap source input to keep prompts inside typical local model context windows.
+    # Full prompt (schema + instructions + source) stays under ~1500 tokens at this limit.
+    max_file_chars: int = 3000
+
     _FORMATS = {
         "llama2": "<s>[INST] <<SYS>>\n{system}\n<</SYS>>\n\n{prompt} [/INST]",
     }
@@ -70,4 +74,31 @@ class LocalBackend(OpenAIBackend):
             max_tokens=2048,
             messages=[{"role": "user", "content": combined}],
         )
+        return response.choices[0].message.content
+
+    def ask_to_analyze(self, prompt: str) -> str:
+        """Request JSON via constrained decoding; falls back to unguided if unsupported."""
+        system = "You are a code style analyst. Return only valid JSON, no explanation."
+        if self._prompt_format == "openai":
+            messages = [
+                {"role": "system", "content": system},
+                {"role": "user", "content": prompt},
+            ]
+        else:
+            template = self._FORMATS[self._prompt_format]
+            messages = [{"role": "user", "content": template.format(system=system, prompt=prompt)}]
+        try:
+            response = self._client.chat.completions.create(
+                model=self._model,
+                max_tokens=2048,
+                messages=messages,
+                response_format={"type": "json_object"},
+            )
+        except Exception:
+            # Server does not support response_format; fall back to unguided generation.
+            response = self._client.chat.completions.create(
+                model=self._model,
+                max_tokens=2048,
+                messages=messages,
+            )
         return response.choices[0].message.content
