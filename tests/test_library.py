@@ -80,61 +80,70 @@ except Exception as e:
     print(f"  mcp: correctly attempts connection ({type(e).__name__})")
 
 
-# ── Test 6: LocalBackend fallback prompt fires on BadRequestError ─────────────
-print("Test 6: LocalBackend uses fallback prompt on BadRequestError ...")
+# ── Tests 6 & 7: LocalBackend (requires openai extra) ─────────────────────────
 import unittest.mock as mock
-import openai as _openai
 
-_fake_msg = mock.Mock()
-_fake_msg.content = '{"naming_style": "snake_case"}'
-_fake_choice = mock.Mock()
-_fake_choice.message = _fake_msg
-_fake_response = mock.Mock()
-_fake_response.choices = [_fake_choice]
+try:
+    import openai as _openai
+    _openai_available = True
+except ImportError:
+    _openai_available = False
 
-_calls = []
+if _openai_available:
+    print("Test 6: LocalBackend uses fallback prompt on BadRequestError ...")
 
-def _fake_create(**kwargs):
-    _calls.append(kwargs)
-    if "response_format" in kwargs:
-        raise _openai.BadRequestError(
-            message="response_format not supported",
-            response=mock.Mock(status_code=400, headers={}),
-            body={"error": {"message": "response_format not supported"}},
-        )
-    return _fake_response
+    _fake_msg = mock.Mock()
+    _fake_msg.content = '{"naming_style": "snake_case"}'
+    _fake_choice = mock.Mock()
+    _fake_choice.message = _fake_msg
+    _fake_response = mock.Mock()
+    _fake_response.choices = [_fake_choice]
 
-with mock.patch("openai.OpenAI") as MockOpenAI:
-    mock_client = mock.Mock()
-    mock_client.chat.completions.create.side_effect = _fake_create
-    MockOpenAI.return_value = mock_client
-    from my_code.backends.openai_backend import LocalBackend
-    lb = LocalBackend(api_key="test", base_url="http://localhost:8080/v1")
-    result = lb.ask_to_analyze("full prompt", fallback_prompt="simple prompt")
+    _calls = []
 
-assert result == '{"naming_style": "snake_case"}', f"Unexpected result: {result}"
-assert len(_calls) == 2, f"Expected 2 calls, got {len(_calls)}"
-assert "response_format" not in _calls[1], "Second call should not have response_format"
-assert _calls[1]["messages"][-1]["content"] == "simple prompt", "Second call should use fallback prompt"
-print("  PASS")
+    def _fake_create(**kwargs):
+        _calls.append(kwargs)
+        if "response_format" in kwargs:
+            raise _openai.BadRequestError(
+                message="response_format not supported",
+                response=mock.Mock(status_code=400, headers={}),
+                body={"error": {"message": "response_format not supported"}},
+            )
+        return _fake_response
 
-# ── Test 7: LocalBackend propagates non-format errors ────────────────────────
-print("Test 7: LocalBackend propagates non-format errors ...")
+    with mock.patch("openai.OpenAI") as MockOpenAI:
+        mock_client = mock.Mock()
+        mock_client.chat.completions.create.side_effect = _fake_create
+        MockOpenAI.return_value = mock_client
+        from my_code.backends.openai_backend import LocalBackend
+        lb = LocalBackend(api_key="test", base_url="http://localhost:8080/v1")
+        result = lb.ask_to_analyze("full prompt", fallback_prompt="simple prompt")
 
-def _raise_timeout(**_):
-    raise _openai.APITimeoutError(request=mock.Mock())
+    assert result == '{"naming_style": "snake_case"}', f"Unexpected result: {result}"
+    assert len(_calls) == 2, f"Expected 2 calls, got {len(_calls)}"
+    assert "response_format" not in _calls[1], "Second call should not have response_format"
+    assert _calls[1]["messages"][-1]["content"] == "simple prompt", "Second call should use fallback prompt"
+    print("  PASS")
 
-with mock.patch("openai.OpenAI") as MockOpenAI:
-    mock_client = mock.Mock()
-    mock_client.chat.completions.create.side_effect = _raise_timeout
-    MockOpenAI.return_value = mock_client
-    from my_code.backends.openai_backend import LocalBackend
-    lb = LocalBackend(api_key="test", base_url="http://localhost:8080/v1")
-    try:
-        lb.ask_to_analyze("prompt", fallback_prompt="fallback")
-        assert False, "Should have raised APITimeoutError"
-    except _openai.APITimeoutError:
-        pass
-print("  PASS")
+    print("Test 7: LocalBackend propagates non-format errors ...")
+
+    def _raise_timeout(**_):
+        raise _openai.APITimeoutError(request=mock.Mock())
+
+    with mock.patch("openai.OpenAI") as MockOpenAI:
+        mock_client = mock.Mock()
+        mock_client.chat.completions.create.side_effect = _raise_timeout
+        MockOpenAI.return_value = mock_client
+        from my_code.backends.openai_backend import LocalBackend
+        lb = LocalBackend(api_key="test", base_url="http://localhost:8080/v1")
+        try:
+            lb.ask_to_analyze("prompt", fallback_prompt="fallback")
+            assert False, "Should have raised APITimeoutError"
+        except _openai.APITimeoutError:
+            pass
+    print("  PASS")
+else:
+    print("Test 6: SKIP (openai not installed)")
+    print("Test 7: SKIP (openai not installed)")
 
 print("\nAll tests passed.")
