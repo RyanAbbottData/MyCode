@@ -87,6 +87,18 @@ my-code --backend local --llm-url http://localhost:8080/v1 serve --port 8000 --d
 >
 > The `local` backend sends `max_tokens=2048` per call, overriding the llama-server default of 128 tokens, so style analysis JSON is never silently truncated.
 
+**Chat template / instruction format:** If your local server does not automatically apply the model's chat template, the model may ignore instructions and return conversational text instead of JSON. Two ways to fix this:
+
+1. **Server-side (recommended):** Pass `--chat-template llama2` when starting llama.cpp so the server applies the template to every request automatically.
+   ```bat
+   llama-server.exe -m codellama-7b-instruct.Q4_K_M.gguf --port 8080 --chat-template llama2
+   ```
+
+2. **Client-side:** Pass `--prompt-format llama2` to `my-code` to have the client wrap prompts in `[INST]`/`[/INST]` before sending.
+   ```bash
+   my-code --backend local --prompt-format llama2 --llm-url http://localhost:8080/v1 analyze ./my_project
+   ```
+
 If you need a full MCP-wrapped setup instead (e.g. the local LLM exposes only `/v1/completions` without chat completions), here is a recommended pattern using [llama.cpp](https://github.com/ggerganov/llama.cpp):
 
 **1. Download a model**
@@ -235,6 +247,7 @@ Options:
   --mcp-url TEXT                         MyCode MCP server URL (mcp backend, default: http://localhost:8001/mcp)
   --llm-url TEXT                         Base URL of a local OpenAI-compatible LLM server (local backend, default: http://localhost:8080/v1)
   --timeout INT                          Request timeout in seconds (default: 600; local LLMs may need 600+)
+  --prompt-format {openai,llama2}        Prompt wrapping for local backend (default: openai). Use 'llama2' if your server does not apply a chat template automatically.
   --profile TEXT                         Path to style profile JSON (default: style_profile.json)
 
 Commands:
@@ -266,7 +279,8 @@ from pathlib import Path
 # Create a backend
 backend = make_backend("claude")                                              # Claude (reads ANTHROPIC_API_KEY)
 backend = make_backend("openai", api_key="sk-...")                            # OpenAI (GPT models)
-backend = make_backend("local", llm_url="http://localhost:8080/v1")           # Local LLM (OpenAI-compatible)
+backend = make_backend("local", llm_url="http://localhost:8080/v1")                            # Local LLM (OpenAI-compatible)
+backend = make_backend("local", llm_url="http://localhost:8080/v1", prompt_format="llama2")  # Local LLM with explicit [INST] wrapping
 backend = make_backend("mcp",   mcp_url="http://localhost:8000/mcp")          # Delegate to a MyCode server
 
 # Analyze a codebase
@@ -469,7 +483,7 @@ my_code/
 ├── backends/
 │   ├── base.py          # AIBackend abstract base class
 │   ├── claude_backend.py
-│   ├── openai_backend.py
+│   ├── openai_backend.py  # OpenAIBackend + LocalBackend (with --prompt-format support)
 │   └── mcp_backend.py   # Generic MCP server backend
 └── utils/
     └── prompts.py       # Prompt templates for extraction, summary, generation

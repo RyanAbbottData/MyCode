@@ -39,3 +39,35 @@ class OpenAIBackend(AIBackend):
             "You are a code style analyst. Return only valid JSON, no explanation.",
             prompt,
         )
+
+
+class LocalBackend(OpenAIBackend):
+    """OpenAI-compatible local LLM with optional explicit instruction formatting.
+
+    Use prompt_format='llama2' when the local server does not apply the model's
+    chat template automatically (e.g. llama.cpp without --chat-template).
+    """
+
+    _FORMATS = {
+        "llama2": "<s>[INST] <<SYS>>\n{system}\n<</SYS>>\n\n{prompt} [/INST]",
+    }
+
+    def __init__(self, *args, prompt_format: str = "openai", **kwargs):
+        """
+        Args:
+            prompt_format: 'openai' uses standard chat roles; 'llama2' wraps in [INST]/[/INST].
+        """
+        super().__init__(*args, **kwargs)
+        self._prompt_format = prompt_format
+
+    def _call(self, system: str, prompt: str) -> str:
+        if self._prompt_format == "openai":
+            return super()._call(system, prompt)
+        template = self._FORMATS[self._prompt_format]
+        combined = template.format(system=system, prompt=prompt)
+        response = self._client.chat.completions.create(
+            model=self._model,
+            max_tokens=2048,
+            messages=[{"role": "user", "content": combined}],
+        )
+        return response.choices[0].message.content

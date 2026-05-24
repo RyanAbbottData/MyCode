@@ -1,7 +1,9 @@
 STYLE_EXTRACTION_PROMPT = """\
-You are a code style analyst. Analyze the following Python source file and return a JSON object describing its style. Be precise and concise.
+You are a code style analyst. Your entire response must be a single valid JSON object.
+Do not include any text, greeting, explanation, or markdown before or after the JSON.
+Do not use code fences. Start your response with { and end it with }.
 
-Return ONLY valid JSON with this exact schema:
+Analyze the following Python source file and return a JSON object describing its style using this exact schema:
 {{
   "naming": {{
     "functions": "<snake_case|camelCase|PascalCase|other>",
@@ -31,7 +33,11 @@ Source file ({filename}):
 """
 
 STYLE_MERGE_PROMPT = """\
-You are a code style analyst. Update the current style profile by merging in a new file observation.
+You are a code style analyst. Your entire response must be a single valid JSON object.
+Do not include any text, greeting, explanation, or markdown before or after the JSON.
+Do not use code fences. Start your response with { and end it with }.
+
+Update the current style profile by merging in a new file observation.
 
 Rules:
 - Where they agree, keep the value.

@@ -1,3 +1,4 @@
+import ast
 import json
 import re
 from pathlib import Path
@@ -19,16 +20,39 @@ def _collect_python_files(root: Path) -> list[Path]:
     return sorted(p for p in root.rglob("*.py") if not _should_skip(p))
 
 
-def _extract_json(text: str) -> dict:
-    # Claude/OpenAI return clean JSON; llama wraps it in prose
+def _repair_json(text: str) -> dict:
+    """Extract and repair JSON from an LLM response using progressive fallbacks."""
+    # Strategy 1: direct parse (fast path for well-behaved models)
     try:
         return json.loads(text.strip())
     except json.JSONDecodeError:
         pass
-    match = re.search(r"\{.*\}", text, re.DOTALL)
-    if not match:
-        raise ValueError(f"No JSON found in response:\n{text[:300]}")
-    return json.loads(match.group())
+
+    # Strategy 2: extract from markdown code fence ```json ... ```
+    fence = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    candidate = fence.group(1) if fence else None
+
+    # Strategy 3: find bare {...} block in prose
+    if candidate is None:
+        obj = re.search(r"\{.*\}", text, re.DOTALL)
+        if obj is None:
+            raise ValueError(f"No JSON found in response:\n{text[:300]}")
+        candidate = obj.group()
+
+    # Strategy 4: ast.literal_eval handles single-quoted dicts and Python constants
+    try:
+        result = ast.literal_eval(candidate)
+        if isinstance(result, dict):
+            return result
+    except (ValueError, SyntaxError):
+        pass
+
+    # Strategy 5: manual substitutions — Python constants → JSON, trailing commas
+    fixed = re.sub(r'\bTrue\b',  'true',  candidate)
+    fixed = re.sub(r'\bFalse\b', 'false', fixed)
+    fixed = re.sub(r'\bNone\b',  'null',  fixed)
+    fixed = re.sub(r',\s*([}\]])', r'\1', fixed)
+    return json.loads(fixed)
 
 
 class StyleAnalyzer:
@@ -42,7 +66,7 @@ class StyleAnalyzer:
         prompt = STYLE_EXTRACTION_PROMPT.format(filename=path.name, source=source)
         raw = self.backend.ask_to_analyze(prompt)
         try:
-            return _extract_json(raw)
+            return _repair_json(raw)
         except (ValueError, json.JSONDecodeError) as e:
             print(f"  [warn] Could not parse style from {path.name}: {e}")
             return {}
@@ -70,7 +94,7 @@ class StyleAnalyzer:
             )
             raw = self.backend.ask_to_analyze(prompt)
             try:
-                profile = _extract_json(raw)
+                profile = _repair_json(raw)
             except (ValueError, json.JSONDecodeError) as e:
                 print(f"  [warn] Could not merge style from {path.name}: {e}")
 

@@ -42,6 +42,7 @@ def cmd_analyze(args):
         llm_url=args.llm_url,
         model=args.model,
         timeout=args.timeout,
+        prompt_format=args.prompt_format,
     )
 
     print(f"Analyzing codebase at {root} ...")
@@ -74,6 +75,7 @@ def cmd_generate(args):
         llm_url=args.llm_url,
         model=args.model,
         timeout=args.timeout,
+        prompt_format=args.prompt_format,
     )
 
     profile = json.loads(profile_path.read_text(encoding="utf-8"))
@@ -131,6 +133,7 @@ def cmd_serve(args):
         llm_url=args.llm_url,
         model=args.model,
         timeout=args.timeout,
+        prompt_format=args.prompt_format,
     )
     MCPServer(backend, host=args.host, port=args.port, default_profile=args.profile).run()
 
@@ -143,6 +146,10 @@ def main():
     )
     parser.add_argument("--api-key", default=None, help="API key (claude/openai); falls back to env var")
     parser.add_argument("--model", default=None, help="Override default model for claude/openai/local backends")
+    parser.add_argument(
+        "--prompt-format", default="openai", choices=["openai", "llama2"],
+        help="Prompt wrapping format for local backend (default: openai). Use 'llama2' if your server does not apply a chat template automatically.",
+    )
     parser.add_argument("--mcp-url", default="http://localhost:8001/mcp", help="MyCode MCP server URL (mcp backend)")
     parser.add_argument("--llm-url", default="http://localhost:8080/v1", help="Base URL of a local OpenAI-compatible LLM server (local backend)")
     parser.add_argument("--timeout", type=int, default=600, help="Request timeout in seconds (default: 600; local LLMs may need 600+)")

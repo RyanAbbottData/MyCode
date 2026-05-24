@@ -2,10 +2,10 @@ import os
 
 from .base import AIBackend
 from .claude_backend import ClaudeBackend
-from .openai_backend import OpenAIBackend
+from .openai_backend import OpenAIBackend, LocalBackend
 from .mcp_backend import MCPBackend
 
-__all__ = ["AIBackend", "ClaudeBackend", "OpenAIBackend", "MCPBackend", "make_backend"]
+__all__ = ["AIBackend", "ClaudeBackend", "OpenAIBackend", "LocalBackend", "MCPBackend", "make_backend"]
 
 def make_backend(
     backend: str = "claude",
@@ -14,6 +14,7 @@ def make_backend(
     llm_url: str = "http://localhost:8080/v1",
     model: str | None = None,
     timeout: int = 600,
+    prompt_format: str = "openai",
 ) -> AIBackend:
     if backend == "claude":
         key = api_key or os.environ.get("ANTHROPIC_API_KEY")
@@ -26,7 +27,7 @@ def make_backend(
             raise ValueError("OpenAI backend requires OPENAI_API_KEY or --api-key")
         return OpenAIBackend(api_key=key, timeout=timeout, **{"model": model} if model else {})
     if backend == "local":
-        return OpenAIBackend(api_key=api_key or "none", base_url=llm_url, timeout=timeout, **{"model": model} if model else {})
+        return LocalBackend(api_key=api_key or "none", base_url=llm_url, timeout=timeout, prompt_format=prompt_format, **{"model": model} if model else {})
     if backend == "mcp":
         return MCPBackend(url=mcp_url, timeout=timeout)
     raise ValueError(f"Unknown backend {backend!r}. Choose: claude, openai, local, mcp")
