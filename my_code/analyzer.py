@@ -47,12 +47,18 @@ def _repair_json(text: str) -> dict:
     except (ValueError, SyntaxError):
         pass
 
-    # Strategy 5: manual substitutions — Python constants → JSON, trailing commas
+    # Strategy 5: Python constants → JSON equivalents, strip trailing commas
     fixed = re.sub(r'\bTrue\b',  'true',  candidate)
     fixed = re.sub(r'\bFalse\b', 'false', fixed)
     fixed = re.sub(r'\bNone\b',  'null',  fixed)
     fixed = re.sub(r',\s*([}\]])', r'\1', fixed)
-    return json.loads(fixed)
+    try:
+        return json.loads(fixed)
+    except json.JSONDecodeError:
+        pass
+
+    # Strategy 6: single-quote → double-quote (safe for enum-like style values)
+    return json.loads(fixed.replace("'", '"'))
 
 
 class StyleAnalyzer:
