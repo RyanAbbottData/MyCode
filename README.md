@@ -83,6 +83,10 @@ my-code --backend local --llm-url http://localhost:8080/v1 analyze ./my_project
 my-code --backend local --llm-url http://localhost:8080/v1 serve --port 8000 --daemon
 ```
 
+> **Timeout note**: CPU-based local LLMs can be slow (a quantized 7B model generates ~3 tokens/sec on CPU). The default `--timeout 600` (10 minutes per LLM call) is designed to accommodate this. If you see `Request timed out.` errors, increase it: `--timeout 1800`. When delegating analysis via `--backend mcp`, also pass a generous `--timeout` on the client side to match the server's total analysis time across all files.
+>
+> The `local` backend sends `max_tokens=2048` per call, overriding the llama-server default of 128 tokens, so style analysis JSON is never silently truncated.
+
 If you need a full MCP-wrapped setup instead (e.g. the local LLM exposes only `/v1/completions` without chat completions), here is a recommended pattern using [llama.cpp](https://github.com/ggerganov/llama.cpp):
 
 **1. Download a model**
@@ -230,6 +234,7 @@ Options:
   --model TEXT                           Override the default model
   --mcp-url TEXT                         MyCode MCP server URL (mcp backend, default: http://localhost:8001/mcp)
   --llm-url TEXT                         Base URL of a local OpenAI-compatible LLM server (local backend, default: http://localhost:8080/v1)
+  --timeout INT                          Request timeout in seconds (default: 600; local LLMs may need 600+)
   --profile TEXT                         Path to style profile JSON (default: style_profile.json)
 
 Commands:
@@ -321,7 +326,8 @@ my-code --backend claude serve --port 8080
 my-code --backend openai serve --port 8080
 
 # Local LLM (OpenAI-compatible server on port 8080)
-my-code --backend local --llm-url http://localhost:8080/v1 serve --port 8000
+# Use --timeout 600+ for CPU-based models; the server passes this to the openai SDK per call
+my-code --backend local --llm-url http://localhost:8080/v1 --timeout 600 serve --port 8000
 
 # Bind on all interfaces
 my-code --backend claude serve --host 0.0.0.0 --port 8080

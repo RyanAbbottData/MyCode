@@ -145,7 +145,7 @@ def main():
     parser.add_argument("--model", default=None, help="Override default model for claude/openai/local backends")
     parser.add_argument("--mcp-url", default="http://localhost:8001/mcp", help="MyCode MCP server URL (mcp backend)")
     parser.add_argument("--llm-url", default="http://localhost:8080/v1", help="Base URL of a local OpenAI-compatible LLM server (local backend)")
-    parser.add_argument("--timeout", type=int, default=120, help="Request timeout in seconds (default: 120)")
+    parser.add_argument("--timeout", type=int, default=600, help="Request timeout in seconds (default: 600; local LLMs may need 600+)")
     parser.add_argument("--profile", default=str(DEFAULT_PROFILE))
 
     sub = parser.add_subparsers(dest="command", required=True)
