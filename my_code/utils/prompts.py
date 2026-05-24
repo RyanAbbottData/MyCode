@@ -1,7 +1,7 @@
 STYLE_EXTRACTION_PROMPT = """\
 You are a code style analyst. Your entire response must be a single valid JSON object.
 Do not include any text, greeting, explanation, or markdown before or after the JSON.
-Do not use code fences. Start your response with { and end it with }.
+Do not use code fences. Start your response with {{ and end it with }}.
 
 Analyze the following Python source file and return a JSON object describing its style using this exact schema:
 {{
@@ -35,7 +35,7 @@ Source file ({filename}):
 STYLE_MERGE_PROMPT = """\
 You are a code style analyst. Your entire response must be a single valid JSON object.
 Do not include any text, greeting, explanation, or markdown before or after the JSON.
-Do not use code fences. Start your response with { and end it with }.
+Do not use code fences. Start your response with {{ and end it with }}.
 
 Update the current style profile by merging in a new file observation.
 
