@@ -87,7 +87,7 @@ my-code --backend local --llm-url http://localhost:8080/v1 serve --port 8000 --d
 >
 > The `local` backend sends `max_tokens=2048` per call, overriding the llama-server default of 128 tokens, so style analysis JSON is never silently truncated.
 
-**JSON output reliability:** The `local` backend requests `response_format: json_object` (constrained decoding) for all analysis calls. When supported by the server, this forces the model to produce valid JSON at the sampling level — eliminating hallucinated non-JSON output regardless of model size. If the server does not support it, the backend falls back to unguided generation automatically.
+**JSON output reliability:** The `local` backend requests `response_format: json_object` (constrained decoding) for all analysis calls. When supported by the server, this forces the model to produce valid JSON at the sampling level — eliminating hallucinated non-JSON output regardless of model size. If the server rejects it (HTTP 400/422 — common on older llama.cpp or Ollama builds), the backend automatically retries with a simplified 4-field flat prompt that small models can follow reliably without grammar constraints. Other errors (timeouts, connection failures) propagate normally so they are not silently swallowed.
 
 | Server | Constrained JSON (`response_format`) |
 |---|---|
@@ -324,8 +324,9 @@ class MyBackend(AIBackend):
         # call your model, return the generated code as a string
         ...
 
-    def ask_to_analyze(self, prompt: str) -> str:
+    def ask_to_analyze(self, prompt: str, fallback_prompt: str | None = None) -> str:
         # call your model, return a JSON string describing the style
+        # fallback_prompt is a simpler version used when the backend cannot enforce JSON output
         ...
 
 backend = MyBackend()

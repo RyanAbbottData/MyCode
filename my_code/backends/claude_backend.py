@@ -25,7 +25,8 @@ class ClaudeBackend(AIBackend):
             prompt,
         )
 
-    def ask_to_analyze(self, prompt: str) -> str:
+    def ask_to_analyze(self, prompt: str, fallback_prompt: str | None = None) -> str:
+        """Request code style analysis as JSON. fallback_prompt is unused (Claude follows instructions reliably)."""
         return self._call(
             "You are a code style analyst. Return only valid JSON, no explanation.",
             prompt,

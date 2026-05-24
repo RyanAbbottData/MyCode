@@ -4,7 +4,12 @@ import re
 from pathlib import Path
 
 from .backends import AIBackend
-from .utils.prompts import STYLE_EXTRACTION_PROMPT, STYLE_MERGE_PROMPT
+from .utils.prompts import (
+    STYLE_EXTRACTION_PROMPT,
+    STYLE_EXTRACTION_PROMPT_SIMPLE,
+    STYLE_MERGE_PROMPT,
+    STYLE_MERGE_PROMPT_SIMPLE,
+)
 
 _SKIP_EXACT = {"__pycache__", ".git", "node_modules", "dist", "build"}
 
@@ -70,7 +75,8 @@ class StyleAnalyzer:
         if not source.strip():
             return {}
         prompt = STYLE_EXTRACTION_PROMPT.format(filename=path.name, source=source)
-        raw = self.backend.ask_to_analyze(prompt)
+        fallback_prompt = STYLE_EXTRACTION_PROMPT_SIMPLE.format(filename=path.name, source=source)
+        raw = self.backend.ask_to_analyze(prompt, fallback_prompt=fallback_prompt)
         try:
             return _repair_json(raw)
         except (ValueError, json.JSONDecodeError) as e:
@@ -98,7 +104,12 @@ class StyleAnalyzer:
                 observation=json.dumps(obs, indent=2),
                 filename=path.name,
             )
-            raw = self.backend.ask_to_analyze(prompt)
+            fallback_prompt = STYLE_MERGE_PROMPT_SIMPLE.format(
+                profile=json.dumps(profile, indent=2),
+                observation=json.dumps(obs, indent=2),
+                filename=path.name,
+            )
+            raw = self.backend.ask_to_analyze(prompt, fallback_prompt=fallback_prompt)
             try:
                 profile = _repair_json(raw)
             except (ValueError, json.JSONDecodeError) as e:

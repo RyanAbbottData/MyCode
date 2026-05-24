@@ -52,6 +52,39 @@ New observation ({filename}):
 {observation}
 """
 
+STYLE_EXTRACTION_PROMPT_SIMPLE = """\
+Return a single JSON object. No text before or after it. Start with {{ end with }}.
+
+Fields:
+- "naming_style": one of "snake_case", "camelCase", "PascalCase", "mixed"
+- "docstring_style": one of "Google", "NumPy", "plain", "none"
+- "import_style": one of "grouped", "flat", "alphabetical", "none"
+- "representative_snippet": one short verbatim code snippet (string)
+
+File ({filename}):
+```python
+{source}
+```
+"""
+
+STYLE_MERGE_PROMPT_SIMPLE = """\
+Return a single JSON object. No text before or after it. Start with {{ end with }}.
+
+Fields:
+- "naming_style": one of "snake_case", "camelCase", "PascalCase", "mixed"
+- "docstring_style": one of "Google", "NumPy", "plain", "none"
+- "import_style": one of "grouped", "flat", "alphabetical", "none"
+- "representative_snippet": one short verbatim code snippet (string)
+
+Merge these two observations. Where they agree keep the value; where they differ pick the more consistent one.
+
+Current profile:
+{profile}
+
+New observation ({filename}):
+{observation}
+"""
+
 CODE_GENERATION_PROMPT = """\
 You are an expert Python developer. Write code that matches the style profile below exactly.
 

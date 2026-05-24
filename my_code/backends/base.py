@@ -9,5 +9,12 @@ class AIBackend(ABC):
         pass
 
     @abstractmethod
-    def ask_to_analyze(self, prompt: str) -> str:
+    def ask_to_analyze(self, prompt: str, fallback_prompt: str | None = None) -> str:
+        """Analyze code style and return a JSON string.
+
+        Args:
+            prompt: Full-detail analysis prompt.
+            fallback_prompt: Simpler prompt used when the backend cannot enforce
+                JSON output constraints (e.g. local servers that reject response_format).
+        """
         pass

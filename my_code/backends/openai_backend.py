@@ -15,6 +15,7 @@ class OpenAIBackend(AIBackend):
         if base_url is not None:
             client_kwargs["base_url"] = base_url
         self._client = openai.OpenAI(**client_kwargs)
+        self._openai = openai
         self._model = model
 
     def _call(self, system: str, prompt: str) -> str:
@@ -34,7 +35,8 @@ class OpenAIBackend(AIBackend):
             prompt,
         )
 
-    def ask_to_analyze(self, prompt: str) -> str:
+    def ask_to_analyze(self, prompt: str, fallback_prompt: str | None = None) -> str:
+        """Request code style analysis as JSON."""
         return self._call(
             "You are a code style analyst. Return only valid JSON, no explanation.",
             prompt,
@@ -76,17 +78,27 @@ class LocalBackend(OpenAIBackend):
         )
         return response.choices[0].message.content
 
-    def ask_to_analyze(self, prompt: str) -> str:
-        """Request JSON via constrained decoding; falls back to unguided if unsupported."""
+    def ask_to_analyze(self, prompt: str, fallback_prompt: str | None = None) -> str:
+        """Request JSON via constrained decoding; falls back to a simpler prompt if unsupported.
+
+        Args:
+            prompt: Full-detail analysis prompt sent with response_format enforcement.
+            fallback_prompt: Simplified prompt used when the server rejects response_format
+                (HTTP 400/422). If None, retries with the original prompt unconstrained.
+        """
         system = "You are a code style analyst. Return only valid JSON, no explanation."
-        if self._prompt_format == "openai":
-            messages = [
-                {"role": "system", "content": system},
-                {"role": "user", "content": prompt},
-            ]
-        else:
+
+        def _build_messages(p: str) -> list[dict]:
+            """Build chat messages, applying manual instruction formatting if configured."""
+            if self._prompt_format == "openai":
+                return [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": p},
+                ]
             template = self._FORMATS[self._prompt_format]
-            messages = [{"role": "user", "content": template.format(system=system, prompt=prompt)}]
+            return [{"role": "user", "content": template.format(system=system, prompt=p)}]
+
+        messages = _build_messages(prompt)
         try:
             response = self._client.chat.completions.create(
                 model=self._model,
@@ -94,11 +106,14 @@ class LocalBackend(OpenAIBackend):
                 messages=messages,
                 response_format={"type": "json_object"},
             )
-        except Exception:
-            # Server does not support response_format; fall back to unguided generation.
+            return response.choices[0].message.content
+        except (self._openai.BadRequestError, self._openai.UnprocessableEntityError):
+            # Server does not support response_format (e.g. older llama.cpp, Ollama builds).
+            # Retry with the simpler fallback prompt and no output constraints.
+            fallback_messages = _build_messages(fallback_prompt) if fallback_prompt else messages
             response = self._client.chat.completions.create(
                 model=self._model,
                 max_tokens=2048,
-                messages=messages,
+                messages=fallback_messages,
             )
-        return response.choices[0].message.content
+            return response.choices[0].message.content
