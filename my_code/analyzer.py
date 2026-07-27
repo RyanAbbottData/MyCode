@@ -4,12 +4,6 @@ import re
 from pathlib import Path
 
 from .backends import AIBackend
-from .utils.prompts import (
-    STYLE_EXTRACTION_PROMPT,
-    STYLE_EXTRACTION_PROMPT_SIMPLE,
-    STYLE_MERGE_PROMPT,
-    STYLE_MERGE_PROMPT_SIMPLE,
-)
 
 _SKIP_EXACT = {"__pycache__", ".git", "node_modules", "dist", "build"}
 
@@ -74,9 +68,8 @@ class StyleAnalyzer:
         source = path.read_text(encoding="utf-8", errors="ignore")[:self.backend.max_file_chars]
         if not source.strip():
             return {}
-        prompt = STYLE_EXTRACTION_PROMPT.format(filename=path.name, source=source)
-        fallback_prompt = STYLE_EXTRACTION_PROMPT_SIMPLE.format(filename=path.name, source=source)
-        raw = self.backend.ask_to_analyze(prompt, fallback_prompt=fallback_prompt)
+        prompt = self.backend.extraction_prompt_template.format(filename=path.name, source=source)
+        raw = self.backend.ask_to_analyze(prompt)
         try:
             return _repair_json(raw)
         except (ValueError, json.JSONDecodeError) as e:
@@ -99,17 +92,12 @@ class StyleAnalyzer:
             if not profile:
                 profile = obs
                 continue
-            prompt = STYLE_MERGE_PROMPT.format(
+            prompt = self.backend.merge_prompt_template.format(
                 profile=json.dumps(profile, indent=2),
                 observation=json.dumps(obs, indent=2),
                 filename=path.name,
             )
-            fallback_prompt = STYLE_MERGE_PROMPT_SIMPLE.format(
-                profile=json.dumps(profile, indent=2),
-                observation=json.dumps(obs, indent=2),
-                filename=path.name,
-            )
-            raw = self.backend.ask_to_analyze(prompt, fallback_prompt=fallback_prompt)
+            raw = self.backend.ask_to_analyze(prompt)
             try:
                 profile = _repair_json(raw)
             except (ValueError, json.JSONDecodeError) as e:

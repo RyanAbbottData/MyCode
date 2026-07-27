@@ -122,7 +122,8 @@ if _openai_available:
     assert result == '{"naming_style": "snake_case"}', f"Unexpected result: {result}"
     assert len(_calls) == 2, f"Expected 2 calls, got {len(_calls)}"
     assert "response_format" not in _calls[1], "Second call should not have response_format"
-    assert _calls[1]["messages"][-1]["content"] == "simple prompt", "Second call should use fallback prompt"
+    # Fallback reuses the same prompt (local prompt is designed to work without constraints)
+    assert _calls[1]["messages"][-1]["content"] == "full prompt", "Second call should reuse the original prompt"
     print("  PASS")
 
     print("Test 7: LocalBackend propagates non-format errors ...")

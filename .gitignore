@@ -6,4 +6,3 @@ dist/
 build/
 .venv/
 venv/
-style_profile.json

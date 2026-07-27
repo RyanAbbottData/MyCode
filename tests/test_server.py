@@ -3,6 +3,7 @@ Tests for the MyCode MCP server.
 Spins up a real ThreadingHTTPServer against a MockBackend and exercises the protocol.
 No live AI backend required.
 """
+import io
 import json
 import socket
 import threading
@@ -11,7 +12,7 @@ from pathlib import Path
 
 import requests
 
-from my_code.server import MCPServer
+from my_code.server import ANALYZE_TOOL, MCPServer
 from my_code import AIBackend
 
 # ── Mock backend (same contract as the one in test_library.py) ────────────────
@@ -132,6 +133,66 @@ class TestMCPServer(unittest.TestCase):
         msg = _parse(resp)
         self.assertIn("error", msg)
         self.assertEqual(msg["error"]["code"], -32602)
+
+
+class TestMCPServerStdio(unittest.TestCase):
+    """The stdio transport used by the Claude Code plugin."""
+
+    def _run(self, *messages, tools=None) -> list[dict]:
+        """Feed JSON-RPC messages through serve_stdio and return the parsed responses."""
+        stdin = io.StringIO("".join(json.dumps(m) + "\n" for m in messages))
+        stdout = io.StringIO()
+        server = MCPServer(MockBackend(), tools=tools)
+        server.serve_stdio(stdin=stdin, stdout=stdout)
+        return [json.loads(line) for line in stdout.getvalue().splitlines() if line]
+
+    def test_initialize_and_tools_list(self):
+        msgs = self._run(
+            {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
+            {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
+        )
+        self.assertEqual(len(msgs), 2)
+        self.assertEqual(msgs[0]["result"]["serverInfo"]["name"], "mycode")
+        tools = {t["name"] for t in msgs[1]["result"]["tools"]}
+        self.assertEqual(tools, {"analyze_codebase", "generate_code"})
+
+    def test_tool_filtering(self):
+        """The plugin narrows the surface to analysis only."""
+        msgs = self._run(
+            {"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}},
+            tools=[ANALYZE_TOOL],
+        )
+        tools = {t["name"] for t in msgs[0]["result"]["tools"]}
+        self.assertEqual(tools, {"analyze_codebase"})
+
+    def test_notification_gets_no_response(self):
+        """Messages without an id must produce no output line — including unknown methods."""
+        msgs = self._run(
+            {"jsonrpc": "2.0", "method": "notifications/initialized"},
+            {"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}},
+        )
+        self.assertEqual(len(msgs), 1)
+        self.assertEqual(msgs[0]["id"], 1)
+
+    def test_library_prints_do_not_corrupt_stdout(self):
+        """analyze_codebase prints progress; stdout is the protocol channel, so it must stay clean."""
+        path = str(Path(__file__).parent.parent / "my_code")
+        msgs = self._run({
+            "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+            "params": {"name": "analyze_codebase", "arguments": {"path": path}},
+        })
+        self.assertEqual(len(msgs), 1)
+        profile = json.loads(msgs[0]["result"]["content"][0]["text"])
+        self.assertIn("naming", profile)
+
+    def test_malformed_line(self):
+        msgs = self._run_raw("not json\n")
+        self.assertEqual(msgs[0]["error"]["code"], -32700)
+
+    def _run_raw(self, text: str) -> list[dict]:
+        stdout = io.StringIO()
+        MCPServer(MockBackend()).serve_stdio(stdin=io.StringIO(text), stdout=stdout)
+        return [json.loads(line) for line in stdout.getvalue().splitlines() if line]
 
 
 if __name__ == "__main__":

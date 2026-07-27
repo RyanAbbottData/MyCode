@@ -274,7 +274,78 @@ Commands:
 
   stop               Stop a running daemon server
     --pid-file TEXT  PID file written by 'serve --daemon' (default: mycode.pid)
+
+  mcp-stdio          Serve MCP over stdin/stdout (used by the Claude Code plugin)
 ```
+
+---
+
+## Use as a Claude Code plugin
+
+MyCode ships as a [Claude Code](https://claude.com/claude-code) plugin as well as a library. The plugin
+lets Claude analyze your codebase's style and then write new code in that style itself.
+
+### Install
+
+The plugin runs the installed Python package, so install that first:
+
+```bash
+pip install mycode-aiagent[claude]
+```
+
+Then add this repo as a plugin marketplace and install:
+
+```bash
+claude plugin marketplace add RyanAbbottData/MyCode
+claude plugin install mycode@mycode
+```
+
+To develop against a local checkout instead, skip the marketplace and run:
+
+```bash
+pip install -e .
+claude --plugin-dir /path/to/MyCode
+```
+
+### What you get
+
+| Component | Name | Purpose |
+|-----------|------|---------|
+| MCP tool | `analyze_codebase` | Analyze a directory and return its style profile |
+| Skill | `/mycode:mycode-style` | Loads `style_profile.json` so Claude writes in your style |
+
+The plugin deliberately exposes **analysis only** — not `generate_code`. Inside Claude Code, calling
+`generate_code` would mean Claude asking a second LLM to write the code and pasting the result back.
+Claude is already the code generator, so the skill hands it the profile and lets it write directly.
+The HTTP server (`my-code serve`) still exposes both tools for non-Claude consumers.
+
+### Configuration
+
+The plugin's MCP server reads its backend configuration from the environment:
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `MYCODE_BACKEND` | `claude` | Backend for analysis: `claude`, `openai`, or `local` |
+| `MYCODE_MODEL` | backend default | Override the model |
+| `MYCODE_LLM_URL` | `http://localhost:8080/v1` | Local LLM server URL when `MYCODE_BACKEND=local` |
+
+API keys come from `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` as usual. Note that Claude Code subscription
+auth does **not** set `ANTHROPIC_API_KEY` — set it yourself, or point the plugin at a local model:
+
+```bash
+export MYCODE_BACKEND=local
+```
+
+The server starts regardless of whether a key is present; a missing key surfaces as an error on the
+tool call, not as a failed plugin load.
+
+### Typical flow
+
+1. Ask Claude to analyze the project — it calls `analyze_codebase` and saves `style_profile.json`.
+2. Ask Claude to write code. The skill picks up the profile automatically and matches your conventions.
+
+> Analysis makes `2N-1` sequential LLM calls for `N` Python files, so large repos take a while.
+> Run it once and commit the resulting `style_profile.json`.
 
 ---
 
@@ -489,7 +560,7 @@ my_code/
 ├── analyzer.py          # StyleAnalyzer — scans files, builds style profile
 ├── generator.py         # generate_code() — formats prompt and calls backend
 ├── mcp_client.py        # MCPClient (raw LLM wrapper) + MyCodeClient (server delegation)
-├── server.py            # MCPServer — exposes analyze/generate as MCP tools
+├── server.py            # MCPServer — exposes analyze/generate as MCP tools (HTTP + stdio)
 ├── cli.py               # CLI entry point (my-code command)
 ├── backends/
 │   ├── base.py          # AIBackend abstract base class
@@ -502,5 +573,11 @@ scripts/
 └── deep_analyze.py      # Multi-query deep style analysis
 tests/
 ├── test_library.py      # Smoke tests for analyze/generate (no live backend)
-└── test_server.py       # MCP server protocol tests (no live backend)
+└── test_server.py       # MCP server protocol tests, HTTP + stdio (no live backend)
+.claude-plugin/
+├── plugin.json          # Claude Code plugin manifest (declares the stdio MCP server)
+└── marketplace.json     # Lets this repo be added as a plugin marketplace
+skills/
+└── mycode-style/
+    └── SKILL.md         # Skill that loads style_profile.json into Claude's context
 ```

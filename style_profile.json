@@ -1,0 +1,49 @@
+{
+  "naming": {
+    "functions": "snake_case",
+    "classes": "PascalCase",
+    "variables": "snake_case",
+    "constants": "UPPER_SNAKE_CASE",
+    "private_prefix": "leading underscore for private methods and module-level helpers",
+    "notes": "verb_noun pattern for functions (cmd_analyze, ask_for_code, analyze_codebase); leading underscore for private methods (_post, _discover_tools, _parse_sse_result, _extract_json)"
+  },
+  "type_annotations": {
+    "usage": "partial",
+    "union_syntax": "X|Y (PEP 604, e.g. str | None)",
+    "return_annotations": "always on public and private functions",
+    "builtin_generics": "list[Path], dict — not List[Path] or Dict",
+    "notes": "All function signatures are annotated. Internal variables are not annotated."
+  },
+  "structure": {
+    "import_grouping": "stdlib first, then third-party, then local — each group separated by blank line",
+    "constants_placement": "module-level constants immediately after imports",
+    "function_before_class": false,
+    "class_method_order": "init_first, then private helpers (underscore prefix), then public interface",
+    "main_guard": "present on entry-point modules (if __name__ == '__main__': main())",
+    "module_docstring": "present on entry-point modules only, contains usage examples",
+    "preferred_length": "short — functions kept to one screen, early returns over nesting"
+  },
+  "error_handling": {
+    "exit_style": "sys.exit for CLI entry points; raise for library/internal code",
+    "exception_types": ["RuntimeError", "ValueError", "FileNotFoundError"],
+    "guard_style": "early return — validity checks at the top, happy path at the bottom",
+    "error_messages": "f-string always, multi-line strings joined with implicit concat"
+  },
+  "strings_and_flow": {
+    "string_formatting": "f-string exclusively",
+    "comprehensions": "used for filtering collections (any(...) in guards)",
+    "method_chaining": "light — one or two chained calls at most (.get().splitlines())",
+    "ternary": "avoided — if/else blocks preferred"
+  },
+  "comments": {
+    "docstring_style": "plain single-line for simple functions; multi-line with Flow: section for complex classes",
+    "docstring_coverage": "public functions and non-trivial private helpers",
+    "inline_density": "sparse",
+    "inline_style": "explain why, not what (e.g. '# Ricky's own instructions: give it explicit, complete prompts')"
+  },
+  "representative_snippets": [
+    "def _parse_sse_result(text: str) -> dict:\n    \"\"\"Extract the first JSON-RPC result/error from an SSE response body.\"\"\"\n    for line in text.splitlines():\n        if line.startswith(\"data:\"):\n            payload = line[5:].strip()\n            if payload and payload != \"[DONE]\":\n                return json.loads(payload)\n    raise ValueError(f\"No data event in SSE body:\\n{text[:400]}\")",
+    "def _collect_python_files(root: Path) -> list[Path]:\n    files = []\n    for path in root.rglob(\"*.py\"):\n        if not any(part in _SKIP_DIRS for part in path.parts):\n            files.append(path)\n    return sorted(files)",
+    "def _extract_json(text: str) -> dict:\n    match = re.search(r\"\\{.*\\}\", text, re.DOTALL)\n    if not match:\n        raise ValueError(f\"No JSON found in response:\\n{text[:300]}\")\n    return json.loads(match.group())"
+  ]
+}

@@ -52,37 +52,37 @@ New observation ({filename}):
 {observation}
 """
 
-STYLE_EXTRACTION_PROMPT_SIMPLE = """\
-Return a single JSON object. No text before or after it. Start with {{ end with }}.
+LOCAL_STYLE_EXTRACTION_PROMPT = """\
+Return ONLY a JSON object, nothing else. No explanation, no markdown.
 
-Fields:
-- "naming_style": one of "snake_case", "camelCase", "PascalCase", "mixed"
-- "docstring_style": one of "Google", "NumPy", "plain", "none"
-- "import_style": one of "grouped", "flat", "alphabetical", "none"
-- "representative_snippet": one short verbatim code snippet (string)
+Example of the exact output format:
+{{"naming": "snake_case", "docstrings": "Google", "imports": "grouped", "comments": "sparse", "snippet": "def load_data(path):\\n    return pd.read_csv(path)"}}
 
-File ({filename}):
+Analyze the Python file below. Return a single JSON object with these 5 keys:
+- naming: snake_case | camelCase | PascalCase | mixed
+- docstrings: Google | NumPy | plain | none
+- imports: grouped | flat | alphabetical | none
+- comments: sparse | moderate | heavy | none
+- snippet: one short code snippet showing the style
+
+File: {filename}
 ```python
 {source}
 ```
 """
 
-STYLE_MERGE_PROMPT_SIMPLE = """\
-Return a single JSON object. No text before or after it. Start with {{ end with }}.
+LOCAL_STYLE_MERGE_PROMPT = """\
+Return ONLY a JSON object, nothing else. No explanation, no markdown.
 
-Fields:
-- "naming_style": one of "snake_case", "camelCase", "PascalCase", "mixed"
-- "docstring_style": one of "Google", "NumPy", "plain", "none"
-- "import_style": one of "grouped", "flat", "alphabetical", "none"
-- "representative_snippet": one short verbatim code snippet (string)
+Example of the exact output format:
+{{"naming": "snake_case", "docstrings": "Google", "imports": "grouped", "comments": "sparse", "snippet": "def load_data(path):\\n    return pd.read_csv(path)"}}
 
-Merge these two observations. Where they agree keep the value; where they differ pick the more consistent one.
+Merge these two style observations. Return a single JSON object with these 5 keys: naming, docstrings, imports, comments, snippet.
+Where values agree, keep them. Where they differ, pick the more common value.
 
-Current profile:
-{profile}
+Profile A: {profile}
 
-New observation ({filename}):
-{observation}
+Profile B (from {filename}): {observation}
 """
 
 CODE_GENERATION_PROMPT = """\

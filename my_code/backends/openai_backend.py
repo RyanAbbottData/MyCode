@@ -1,4 +1,5 @@
 from .base import AIBackend
+from ..utils.prompts import LOCAL_STYLE_EXTRACTION_PROMPT, LOCAL_STYLE_MERGE_PROMPT
 
 
 class OpenAIBackend(AIBackend):
@@ -50,9 +51,9 @@ class LocalBackend(OpenAIBackend):
     chat template automatically (e.g. llama.cpp without --chat-template).
     """
 
-    # Cap source input to keep prompts inside typical local model context windows.
-    # Full prompt (schema + instructions + source) stays under ~1500 tokens at this limit.
     max_file_chars: int = 3000
+    extraction_prompt_template: str = LOCAL_STYLE_EXTRACTION_PROMPT
+    merge_prompt_template: str = LOCAL_STYLE_MERGE_PROMPT
 
     _FORMATS = {
         "llama2": "<s>[INST] <<SYS>>\n{system}\n<</SYS>>\n\n{prompt} [/INST]",
@@ -79,12 +80,11 @@ class LocalBackend(OpenAIBackend):
         return response.choices[0].message.content
 
     def ask_to_analyze(self, prompt: str, fallback_prompt: str | None = None) -> str:
-        """Request JSON via constrained decoding; falls back to a simpler prompt if unsupported.
+        """Request JSON via constrained decoding; retries without constraints if unsupported.
 
-        Args:
-            prompt: Full-detail analysis prompt sent with response_format enforcement.
-            fallback_prompt: Simplified prompt used when the server rejects response_format
-                (HTTP 400/422). If None, retries with the original prompt unconstrained.
+        The local prompt template is already designed to elicit JSON without grammar
+        constraints, so the same prompt is used for both the primary and fallback attempts.
+        fallback_prompt is accepted for interface compatibility but ignored.
         """
         system = "You are a code style analyst. Return only valid JSON, no explanation."
 
@@ -108,12 +108,10 @@ class LocalBackend(OpenAIBackend):
             )
             return response.choices[0].message.content
         except (self._openai.BadRequestError, self._openai.UnprocessableEntityError):
-            # Server does not support response_format (e.g. older llama.cpp, Ollama builds).
-            # Retry with the simpler fallback prompt and no output constraints.
-            fallback_messages = _build_messages(fallback_prompt) if fallback_prompt else messages
+            # Server does not support response_format; retry without output constraints.
             response = self._client.chat.completions.create(
                 model=self._model,
                 max_tokens=2048,
-                messages=fallback_messages,
+                messages=messages,
             )
             return response.choices[0].message.content

@@ -1,4 +1,4 @@
-__version__ = "0.5.4"
+__version__ = "0.6.0"
 
 from .analyzer import StyleAnalyzer
 from .generator import generate_code
