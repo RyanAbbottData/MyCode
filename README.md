@@ -91,4 +91,4 @@ The profile describes **style, not correctness**. It never overrides your projec
 
 ## Previously a Python library
 
-MyCode was previously distributed as a Python package, `mycode-aiagent` on PyPI. That package is discontinued as of version 0.7.0 and is unrelated to this plugin — you do not need to `pip install` anything. This plugin replaces it in full and needs none of the old package, its API keys, or its server.
+MyCode was previously distributed as a Python package, `mycode-aiagent` on PyPI. Version 0.7.0 was its final release; the package is discontinued as of 1.0.0 and is unrelated to this plugin — you do not need to `pip install` anything. This plugin replaces it in full and needs none of the old package, its API keys, or its server.
