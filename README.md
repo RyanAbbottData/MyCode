@@ -339,13 +339,78 @@ export MYCODE_BACKEND=local
 The server starts regardless of whether a key is present; a missing key surfaces as an error on the
 tool call, not as a failed plugin load.
 
-### Typical flow
+### Using it
 
-1. Ask Claude to analyze the project — it calls `analyze_codebase` and saves `style_profile.json`.
-2. Ask Claude to write code. The skill picks up the profile automatically and matches your conventions.
+#### 1. Confirm the plugin loaded
 
-> Analysis makes `2N-1` sequential LLM calls for `N` Python files, so large repos take a while.
-> Run it once and commit the resulting `style_profile.json`.
+Run `/plugin` inside Claude Code, or just ask:
+
+> list your MCP servers
+
+You should see `mycode (plugin)`. If it is missing, see [Troubleshooting](#troubleshooting) below.
+
+#### 2. Build the style profile (once per project)
+
+Ask Claude to analyze the project:
+
+> Analyze this repo's coding style and save it to style_profile.json
+
+Claude calls `analyze_codebase` with `path` and `save_to`, and writes the profile to disk. This is the
+slow step — see the cost note at the end of this section.
+
+You can also build the profile outside Claude Code with the CLI; the plugin reads whatever is on disk:
+
+```bash
+my-code analyze . --verbose
+```
+
+#### 3. Write code in your style
+
+Just ask for code normally:
+
+> Add a function that loads config from a YAML file
+
+The `mycode-style` skill fires on its own when a `style_profile.json` is present, reads it, and applies
+your conventions — naming, import grouping, docstring style, error handling — before Claude writes
+anything. To force it explicitly:
+
+```
+/mycode:mycode-style
+```
+
+#### What the skill actually applies
+
+| Profile key | Effect on generated code |
+|-------------|--------------------------|
+| `naming` | Identifier conventions for functions, classes, variables, constants |
+| `structure` | Import grouping, module layout, class/method ordering, function length |
+| `comments` | Docstring style and inline comment density |
+| `representative_snippets` | Formatting ground truth — copied when the prose fields are ambiguous |
+
+The profile schema varies by backend, so the skill reads whichever keys are present rather than assuming a
+fixed shape. It describes **style, not correctness**: it never overrides your `CLAUDE.md`, your linter
+config, or an explicit instruction in your prompt.
+
+### Troubleshooting
+
+| Symptom | Cause and fix |
+|---------|---------------|
+| `mycode` missing from the MCP server list | `python` or the package isn't resolvable. Check with `python -m my_code mcp-stdio` — it should sit waiting on stdin, not error. If it fails, `pip install mycode-aiagent` into the same interpreter that `python` resolves to. |
+| Tool call returns *"Claude backend requires ANTHROPIC_API_KEY"* | Expected when using subscription auth. Set the key, or `export MYCODE_BACKEND=local` and start a local model. The server itself still loads fine. |
+| Skill never fires | No `style_profile.json` in the working directory. Run step 2, or invoke `/mycode:mycode-style` explicitly. |
+| Generated code ignores the profile | An explicit instruction in your prompt, or your `CLAUDE.md`, takes precedence by design. |
+
+To smoke-test the MCP server without Claude Code at all:
+
+```bash
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | python -m my_code mcp-stdio
+```
+
+It should print one JSON line advertising `analyze_codebase`.
+
+> **Cost note.** Analysis makes `2N-1` sequential LLM calls for `N` Python files, so large repos take a
+> while and are not free. Run it once and commit the resulting `style_profile.json` so your whole team
+> shares one profile.
 
 ---
 
