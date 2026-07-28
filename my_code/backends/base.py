@@ -1,8 +1,12 @@
 from abc import ABC, abstractmethod
 
+from ..utils.prompts import STYLE_EXTRACTION_PROMPT, STYLE_MERGE_PROMPT
+
 
 class AIBackend(ABC):
     max_file_chars: int = 6000
+    extraction_prompt_template: str = STYLE_EXTRACTION_PROMPT
+    merge_prompt_template: str = STYLE_MERGE_PROMPT
 
     @abstractmethod
     def ask_for_code(self, prompt: str) -> str:

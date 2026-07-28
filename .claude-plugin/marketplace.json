@@ -1,0 +1,15 @@
+{
+  "name": "mycode",
+  "description": "Style-aware code generation — teach Claude to write code the way you write it",
+  "owner": {
+    "name": "Ryan Abbott",
+    "url": "https://github.com/RyanAbbottData"
+  },
+  "plugins": [
+    {
+      "name": "mycode",
+      "source": "./",
+      "description": "Analyze a codebase's coding style and write new code that matches it"
+    }
+  ]
+}

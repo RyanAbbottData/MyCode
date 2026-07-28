@@ -18,7 +18,7 @@ from .analyzer import StyleAnalyzer
 from .backends import make_backend
 from .generator import generate_code
 from .mcp_client import MyCodeClient
-from .server import MCPServer
+from .server import ANALYZE_TOOL, MCPServer
 
 DEFAULT_PROFILE = Path("style_profile.json")
 
@@ -138,6 +138,20 @@ def cmd_serve(args):
     MCPServer(backend, host=args.host, port=args.port, default_profile=args.profile).run()
 
 
+def cmd_mcp_stdio(args):
+    # Config comes from the environment so the Claude Code plugin manifest needs no argument
+    # expansion. Passed as a factory so a missing API key fails the tool call, not the launch.
+    def backend_factory():
+        return make_backend(
+            backend=os.environ.get("MYCODE_BACKEND", "claude"),
+            model=os.environ.get("MYCODE_MODEL"),
+            llm_url=os.environ.get("MYCODE_LLM_URL", "http://localhost:8080/v1"),
+        )
+
+    # Analysis only: inside Claude Code, Claude writes the code itself from the profile.
+    MCPServer(backend_factory, default_profile=args.profile, tools=[ANALYZE_TOOL]).serve_stdio()
+
+
 def main():
     parser = argparse.ArgumentParser(description="Style-aware code agent")
     parser.add_argument(
@@ -172,6 +186,9 @@ def main():
     p_serve.add_argument("--daemon", action="store_true", help="Run server as a detached background process")
     p_serve.add_argument("--pid-file", default="mycode.pid", help="PID file path when running as daemon (default: mycode.pid)")
     p_serve.set_defaults(func=cmd_serve)
+
+    p_stdio = sub.add_parser("mcp-stdio", help="Serve MCP over stdin/stdout (used by the Claude Code plugin)")
+    p_stdio.set_defaults(func=cmd_mcp_stdio)
 
     p_stop = sub.add_parser("stop", help="Stop a running daemon server")
     p_stop.add_argument("--pid-file", default="mycode.pid", help="PID file written by 'serve --daemon' (default: mycode.pid)")

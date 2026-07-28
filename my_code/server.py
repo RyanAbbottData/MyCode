@@ -1,55 +1,60 @@
+import contextlib
 import json
+import sys
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from . import __version__
 from .analyzer import StyleAnalyzer
+from .backends.base import AIBackend
 from .generator import generate_code as _generate_code
 
 _PROTOCOL = "2024-11-05"
 
-_TOOLS = [
-    {
-        "name": "analyze_codebase",
-        "description": "Analyze a codebase directory and extract its coding style profile.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "description": "Path to the codebase directory to analyze.",
-                },
-                "save_to": {
-                    "type": "string",
-                    "description": "Optional path to save the resulting profile JSON file.",
-                },
+ANALYZE_TOOL = {
+    "name": "analyze_codebase",
+    "description": "Analyze a codebase directory and extract its coding style profile.",
+    "inputSchema": {
+        "type": "object",
+        "properties": {
+            "path": {
+                "type": "string",
+                "description": "Path to the codebase directory to analyze.",
             },
-            "required": ["path"],
-        },
-    },
-    {
-        "name": "generate_code",
-        "description": "Generate Python code that matches a saved style profile.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "task": {
-                    "type": "string",
-                    "description": "Description of what code to write.",
-                },
-                "profile": {
-                    "type": "object",
-                    "description": "Inline style profile object — takes precedence over profile_path.",
-                },
-                "profile_path": {
-                    "type": "string",
-                    "description": "Path to a saved style_profile.json (default: style_profile.json).",
-                },
+            "save_to": {
+                "type": "string",
+                "description": "Optional path to save the resulting profile JSON file.",
             },
-            "required": ["task"],
         },
+        "required": ["path"],
     },
-]
+}
+
+GENERATE_TOOL = {
+    "name": "generate_code",
+    "description": "Generate Python code that matches a saved style profile.",
+    "inputSchema": {
+        "type": "object",
+        "properties": {
+            "task": {
+                "type": "string",
+                "description": "Description of what code to write.",
+            },
+            "profile": {
+                "type": "object",
+                "description": "Inline style profile object — takes precedence over profile_path.",
+            },
+            "profile_path": {
+                "type": "string",
+                "description": "Path to a saved style_profile.json (default: style_profile.json).",
+            },
+        },
+        "required": ["task"],
+    },
+}
+
+_TOOLS = [ANALYZE_TOOL, GENERATE_TOOL]
 
 
 class _MCPError(Exception):
@@ -100,17 +105,19 @@ class _MCPRequestHandler(BaseHTTPRequestHandler):
 
 
 class MCPServer:
-    def __init__(self, backend, host: str = "127.0.0.1", port: int = 8080, default_profile: str = "style_profile.json"):
+    def __init__(self, backend, host: str = "127.0.0.1", port: int = 8080, default_profile: str = "style_profile.json", tools: list | None = None):
         self._backend = backend
         self._host = host
         self._port = port
         self._default_profile = default_profile
+        # Narrow the advertised tool set (the Claude Code plugin exposes analysis only).
+        self._tools = tools or _TOOLS
 
     def _handle(self, method: str, params: dict) -> tuple[dict, dict | None]:
         if method == "initialize":
             return self._initialize(), {"Mcp-Session-Id": str(uuid.uuid4())}
         if method == "tools/list":
-            return {"tools": _TOOLS}, None
+            return {"tools": self._tools}, None
         if method == "tools/call":
             name = params.get("name", "")
             arguments = params.get("arguments", {})
@@ -122,10 +129,14 @@ class MCPServer:
         return {
             "protocolVersion": _PROTOCOL,
             "capabilities": {"tools": {}},
-            "serverInfo": {"name": "mycode", "version": "0.3.0"},
+            "serverInfo": {"name": "mycode", "version": __version__},
         }
 
     def _call_tool(self, name: str, args: dict) -> str:
+        # A backend may be passed as a factory so misconfiguration surfaces here, as a tool
+        # error, rather than preventing the server from starting at all.
+        if not isinstance(self._backend, AIBackend):
+            self._backend = self._backend()
         if name == "analyze_codebase":
             return self._analyze(args)
         if name == "generate_code":
@@ -147,6 +158,44 @@ class MCPServer:
             profile_path = Path(args.get("profile_path") or self._default_profile)
             profile = StyleAnalyzer.load_profile(profile_path)
         return _generate_code(task=task, backend=self._backend, profile=profile)
+
+    def serve_stdio(self, stdin=None, stdout=None):
+        """Serve MCP over line-delimited JSON-RPC on stdin/stdout, for use as a subprocess."""
+        stdin = stdin or sys.stdin
+        stdout = stdout or sys.stdout
+
+        for line in stdin:
+            line = line.strip()
+            if not line:
+                continue
+
+            try:
+                msg = json.loads(line)
+            except json.JSONDecodeError:
+                self._write(stdout, {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error"}})
+                continue
+
+            # Notifications carry no id and take no response — including unknown ones.
+            req_id = msg.get("id")
+            is_notification = "id" not in msg
+
+            try:
+                # stdout is the protocol channel here, so library progress prints go to stderr.
+                with contextlib.redirect_stdout(sys.stderr):
+                    result, _ = self._handle(msg.get("method", ""), msg.get("params", {}))
+                response = {"jsonrpc": "2.0", "id": req_id, "result": result}
+            except _MCPError as e:
+                response = {"jsonrpc": "2.0", "id": req_id, "error": {"code": e.code, "message": e.message}}
+            except Exception as e:
+                response = {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32603, "message": str(e)}}
+
+            if not is_notification:
+                self._write(stdout, response)
+
+    @staticmethod
+    def _write(stdout, payload: dict):
+        stdout.write(json.dumps(payload) + "\n")
+        stdout.flush()
 
     def start(self) -> ThreadingHTTPServer:
         httpd = ThreadingHTTPServer((self._host, self._port), _MCPRequestHandler)
