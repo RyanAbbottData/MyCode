@@ -1,7 +1,6 @@
 {
   "name": "mycode",
-  "displayName": "MyCode",
-  "version": "0.6.0",
+  "version": "1.0.0",
   "description": "Analyze a codebase's coding style and write new code that matches it",
   "author": {
     "name": "Ryan Abbott",
@@ -10,11 +9,5 @@
   "homepage": "https://github.com/RyanAbbottData/MyCode",
   "repository": "https://github.com/RyanAbbottData/MyCode",
   "license": "MIT",
-  "keywords": ["code style", "code generation", "style analysis"],
-  "mcpServers": {
-    "mycode": {
-      "command": "python",
-      "args": ["-m", "my_code", "mcp-stdio"]
-    }
-  }
+  "keywords": ["code style", "code generation", "style analysis"]
 }
